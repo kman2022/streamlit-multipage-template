@@ -6,7 +6,7 @@ st.set_page_config(layout="wide")
 # Customize the sidebar
 markdown = """
 Web App URL: <https://template.streamlit.app>
-GitHub Repository: <https://github.com/giswqs/streamlit-multipage-template>
+GitHub Repository: <https://github.com/kman2022/streamlit-multipage-template>
 """
 
 st.sidebar.title("About")
