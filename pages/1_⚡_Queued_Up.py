@@ -1,10 +1,10 @@
 import datetime
 import os
 import pathlib
-import requests
 import zipfile
 import pandas as pd
 import pydeck as pdk
+import altair as alt
 import geopandas as gpd
 import streamlit as st
 import leafmap.colormaps as cm
@@ -21,93 +21,37 @@ mkdwn_analysis = """
 
 st.sidebar.info(mkdwn_analysis)
 
-link_prefix = "https://raw.githubusercontent.com/kman2022/data/main/"
+link_prefix = "https://raw.githubusercontent.com/kman2022/data/main/main/"
+csv_trend = link_prefix + "berkley/df_trend.csv"
+csv_duration = link_prefix + "berkley/df_trend_dur.csv"
+csv_q_hist = link_prefix + "berkley/df_iq_clean.csv"
+FUEL_LIST = ['Gas', 'Wind', 'Hydro', 'Solar', 'Other', 'Geothermal',
+       'Other Storage', 'Nuclear', 'Wind+Battery', 'Solar+Battery',
+       'Gas+Battery', 'Solar+Wind', 'Gas+Solar', 'Solar+Gas', 'Battery',
+       'Battery+Gas', 'Coal', 'Offshore Wind', 'Wind+Storage',
+       'Wind+Gas', 'CSP']
+REGION_LIST = ['CAISO', 'ISO-NE', 'MISO', 'PJM', 'NYISO', 'SPP', 'ERCOT',
+       'Southeast (non-ISO)', 'West (non-ISO)']
 
-data_links = {
-    "trend": {
-        "status": link_prefix + "berkley/df_trend.csv",    
-    },
-    "duration": {
-        "no_months": link_prefix + "berkley/df_trend_dur.csv",
-    },
-    "historical": {
-        "data": link_prefix + "berkley/df_iq_clean.csv",
-    },
-}
+@st.cache_data(persist=True)
+def load_q_data():
+    # trend
+    df_trend = pd.read_csv(csv_trend, usecols=['q_year', 'q_status', 'cod_year', 'type_clean', 'mw1','region'])    
+    # duration
+    df_dur = pd.read_csv(csv_duration)
+    # history
+    df_hist = pd.read_csv(csv_duration)
+    return df_trend, df_dur, df_hist
 
-@st.cache_data
-def get_inventory_data(url):
-    df = pd.read_csv(url)
-    url = url.lower()
+# Load data
+df_trend, df_dur, df_hist = load_q_data()
 
-    return df
-
-@st.cache_data
-def get_geom_data(category):
-
-    prefix = (
-        "https://raw.githubusercontent.com/kman2022/data/main/"
-    )
-    links = {
-        "national": prefix + "us_nation.geojson",
-    }
-
-
-def join_attributes(gdf, df, category):
-
-    new_gdf = None
-    if category == "county":
-        new_gdf = gdf.merge(df, left_on="GEOID", right_on="county_fips", how="outer")
-    elif category == "state":
-        new_gdf = gdf.merge(df, left_on="STUSPS", right_on="STUSPS", how="outer")
-    elif category == "national":
-        if "geo_country" in df.columns.values.tolist():
-            df["country"] = None
-            df.loc[0, "country"] = "United States"
-        new_gdf = gdf.merge(df, left_on="NAME", right_on="country", how="outer")
-    elif category == "metro":
-        new_gdf = gdf.merge(df, left_on="CBSAFP", right_on="cbsa_code", how="outer")
-    elif category == "zip":
-        new_gdf = gdf.merge(df, left_on="GEOID10", right_on="postal_code", how="outer")
-    return new_gdf
-
-
-def select_non_null(gdf, col_name):
-    new_gdf = gdf[~gdf[col_name].isna()]
-    return new_gdf
-
-
-def select_null(gdf, col_name):
-    new_gdf = gdf[gdf[col_name].isna()]
-    return new_gdf
-
-
-def get_data_dict(name):
-    in_csv = os.path.join(os.getcwd(), "data/realtor_data_dict.csv")
-    df = pd.read_csv(in_csv)
-    label = list(df[df["Name"] == name]["Label"])[0]
-    desc = list(df[df["Name"] == name]["Description"])[0]
-    return label, desc
-
-
-def get_weeks(df):
-    seq = list(set(df[~df["week_end_date"].isnull()]["week_end_date"].tolist()))
-    weeks = [
-        datetime.date(int(d.split("/")[2]), int(d.split("/")[0]), int(d.split("/")[1]))
-        for d in seq
-    ]
-    weeks.sort()
-    return weeks
-
-
-def get_saturday(in_date):
-    idx = (in_date.weekday() + 1) % 7
-    sat = in_date + datetime.timedelta(6 - idx)
-    return sat
-
+def regions(df):
+    region_list = list(df['region'].unique())
+    default_region = region_list.index('PJM')
+    return region_list, default_region
 
 def app():
-
     st.title("U.S. Interconnection Data and Market Trends")
     st.markdown(
         """**Introduction:** This interactive dashboard is designed for visualizing U.S. electrical interconnection data and trends at multiple levels (i.e., national,
@@ -118,92 +62,73 @@ def app():
     """
     )
 
-    with st.expander("See a summary"):
-        st.image("https://emp.lbl.gov/sites/default/files/styles/maximage/public/queues_2022_fig_2.png?itok=nv60DsRh")
-
-#    row1_col1, row1_col2, row1_col3, row1_col4, row1_col5 = st.columns(
-#        [0.6, 0.8, 0.6, 1.4, 2]
-#    )
-    row1_col1, row1_col2, row1_col3, row1_col4, row1_col5 = st.columns(
-    [0.6, 0.8, 0.6, 1.4, 2]
+    row1_col1, row1_col2, row1_col3 = st.columns(
+    [3.0, 3.0, 3.4]
     )
+    # Load regions
+    region_list, default_region = regions(df_hist)
+
+    #fuels_list, default_ft = fuel_types(df_dur)
     with row1_col1:
-        frequency = st.selectbox("Monthly/weekly data", ["Monthly", "Weekly"])
+        # on the first run add variables to track in state
+        if "all_option" not in st.session_state:
+            st.session_state.all_option = True
+            st.session_state.selected_options = FUEL_LIST
+
+        def check_change():
+        # this runs BEFORE the rest of the script when a change is detected 
+        # from your checkbox to set selectbox
+            if st.session_state.all_option:
+                st.session_state.selected_options = FUEL_LIST
+            else:
+                st.session_state.selected_options = []
+            return
+
+        def multi_change():
+        # this runs BEFORE the rest of the script when a change is detected
+        # from your selectbox to set checkbox
+            if len(st.session_state.selected_options) == 3:
+                st.session_state.all_option = True
+            else:
+                st.session_state.all_option = False
+            return
+
+        selected_options_ft = st.multiselect("Select one or more options:",
+                FUEL_LIST,key="selected_options", on_change=multi_change)
+
+        all_ft = st.checkbox("Select all", key='all_option',on_change= check_change)
+    
     with row1_col2:
-        types = ["Current month data", "Historical data"]
-        if frequency == "Weekly":
-            types.remove("Current month data")
-        cur_hist = st.selectbox(
-            "Current/historical data",
-            types,
-        )
+        region_select = st.selectbox('Region:', region_list,index=default_region,help = 'Filter report to show the market region')
+
     with row1_col3:
-        if frequency == "Monthly":
-            scale = st.selectbox(
-                "Scale", ["National", "State", "Metro", "County"], index=3
-            )
-        else:
-            scale = st.selectbox("Scale", ["National", "Metro"], index=1)
+        qyear_select = st.selectbox("Online Year:",range(2001,2026),1,help = 'Filter report to show the year the project entered the queue')
 
-    gdf = get_geom_data(scale.lower())
-
-    if frequency == "Weekly":
-        inventory_df = get_inventory_data(data_links["weekly"][scale.lower()])
-        weeks = get_weeks(inventory_df)
-        with row1_col1:
-            selected_date = st.date_input("Select a date", value=weeks[-1])
-            saturday = get_saturday(selected_date)
-            selected_period = saturday.strftime("%-m/%-d/%Y")
-            if saturday not in weeks:
-                st.error(
-                    "The selected date is not available in the data. Please select a date between {} and {}".format(
-                        weeks[0], weeks[-1]
+    row2_col1, row2_col2= st.columns([5,1])
+    #with st.expander("See a summary"):
+    with row2_col1:
+        df_chart_trend = df_trend[(df_trend['region']==region_select)&(df_trend['type_clean'].isin(selected_options_ft))&(df_trend['q_year']>=qyear_select)]
+        df_chart_trend = df_chart_trend[['q_year','q_status','mw1']]
+        row2_col1.subheader("Trend")
+        bar_chart = alt.Chart(
+                        df_chart_trend,
+                    ).mark_bar().encode(
+                        x = 'q_year:O',
+                        y = 'sum(mw1):Q',
+                        color = 'q_status:N'
                     )
-                )
-                selected_period = weeks[-1].strftime("%-m/%-d/%Y")
-        inventory_df = get_inventory_data(data_links["weekly"][scale.lower()])
-        inventory_df = filter_weekly_inventory(inventory_df, selected_period)
+        st.altair_chart(bar_chart, use_container_width=True)
 
-    if frequency == "Monthly":
-        if cur_hist == "Current month data":
-            inventory_df = get_inventory_data(
-                data_links["monthly_current"][scale.lower()]
-            )
-            selected_period = get_periods(inventory_df)[0]
-        else:
-            with row1_col2:
-                inventory_df = get_inventory_data(
-                    data_links["monthly_historical"][scale.lower()]
-                )
-                start_year, end_year = get_start_end_year(inventory_df)
-                periods = get_periods(inventory_df)
-                with st.expander("Select year and month", True):
-                    selected_year = st.slider(
-                        "Year",
-                        start_year,
-                        end_year,
-                        value=start_year,
-                        step=1,
-                    )
-                    selected_month = st.slider(
-                        "Month",
-                        min_value=1,
-                        max_value=12,
-                        value=int(periods[0][-2:]),
-                        step=1,
-                    )
-                selected_period = str(selected_year) + str(selected_month).zfill(2)
-                if selected_period not in periods:
-                    st.error("Data not available for selected year and month")
-                    selected_period = periods[0]
-                inventory_df = inventory_df[
-                    inventory_df["month_date_yyyymm"] == int(selected_period)
-                ]
-
-    data_cols = get_data_columns(inventory_df, scale.lower(), frequency.lower())
+    # LOAD DATA
+    # df_trend, df_dur, df_hist = load_q_data()
+    # df_hist = fuel_types() 
+    # LOAD MAP AND FILTERS
+    # fuel_type = fuel_types(df_dur)
+    #region = region_select(df_dur)
+    #status_type = status_types(df_dur)
 
     with row1_col4:
-        selected_col = st.selectbox("Attribute", data_cols)
+        selected_col = st.selectbox("Attribute")
     with row1_col5:
         show_desc = st.checkbox("Show attribute description")
         if show_desc:
@@ -215,158 +140,8 @@ def app():
                 st.markdown(markdown)
             except:
                 st.warning("No description available for selected attribute")
-
     row2_col1, row2_col2, row2_col3, row2_col4, row2_col5, row2_col6 = st.columns(
         [0.6, 0.68, 0.7, 0.7, 1.5, 0.8]
     )
-
-    palettes = cm.list_colormaps()
-    with row2_col1:
-        palette = st.selectbox("Color palette", palettes, index=palettes.index("Blues"))
-    with row2_col2:
-        n_colors = st.slider("Number of colors", min_value=2, max_value=20, value=8)
-    with row2_col3:
-        show_nodata = st.checkbox("Show nodata areas", value=True)
-    with row2_col4:
-        show_3d = st.checkbox("Show 3D view", value=False)
-    with row2_col5:
-        if show_3d:
-            elev_scale = st.slider(
-                "Elevation scale", min_value=1, max_value=1000000, value=1, step=10
-            )
-            with row2_col6:
-                st.info("Press Ctrl and move the left mouse button.")
-        else:
-            elev_scale = 1
-
-    gdf = join_attributes(gdf, inventory_df, scale.lower())
-    gdf_null = select_null(gdf, selected_col)
-    gdf = select_non_null(gdf, selected_col)
-    gdf = gdf.sort_values(by=selected_col, ascending=True)
-
-    colors = cm.get_palette(palette, n_colors)
-    colors = [hex_to_rgb(c) for c in colors]
-
-    for i, ind in enumerate(gdf.index):
-        index = int(i / (len(gdf) / len(colors)))
-        if index >= len(colors):
-            index = len(colors) - 1
-        gdf.loc[ind, "R"] = colors[index][0]
-        gdf.loc[ind, "G"] = colors[index][1]
-        gdf.loc[ind, "B"] = colors[index][2]
-
-    initial_view_state = pdk.ViewState(
-        latitude=40,
-        longitude=-100,
-        zoom=3,
-        max_zoom=16,
-        pitch=0,
-        bearing=0,
-        height=900,
-        width=None,
-    )
-
-    min_value = gdf[selected_col].min()
-    max_value = gdf[selected_col].max()
-    color = "color"
-    # color_exp = f"[({selected_col}-{min_value})/({max_value}-{min_value})*255, 0, 0]"
-    color_exp = f"[R, G, B]"
-
-    geojson = pdk.Layer(
-        "GeoJsonLayer",
-        gdf,
-        pickable=True,
-        opacity=0.5,
-        stroked=True,
-        filled=True,
-        extruded=show_3d,
-        wireframe=True,
-        get_elevation=f"{selected_col}",
-        elevation_scale=elev_scale,
-        # get_fill_color="color",
-        get_fill_color=color_exp,
-        get_line_color=[0, 0, 0],
-        get_line_width=2,
-        line_width_min_pixels=1,
-    )
-
-    geojson_null = pdk.Layer(
-        "GeoJsonLayer",
-        gdf_null,
-        pickable=True,
-        opacity=0.2,
-        stroked=True,
-        filled=True,
-        extruded=False,
-        wireframe=True,
-        # get_elevation="properties.ALAND/100000",
-        # get_fill_color="color",
-        get_fill_color=[200, 200, 200],
-        get_line_color=[0, 0, 0],
-        get_line_width=2,
-        line_width_min_pixels=1,
-    )
-
-    # tooltip = {"text": "Name: {NAME}"}
-
-    # tooltip_value = f"<b>Value:</b> {median_listing_price}""
-    tooltip = {
-        "html": "<b>Name:</b> {NAME}<br><b>Value:</b> {"
-        + selected_col
-        + "}<br><b>Date:</b> "
-        + selected_period
-        + "",
-        "style": {"backgroundColor": "steelblue", "color": "white"},
-    }
-
-    layers = [geojson]
-    if show_nodata:
-        layers.append(geojson_null)
-
-    r = pdk.Deck(
-        layers=layers,
-        initial_view_state=initial_view_state,
-        map_style="light",
-        tooltip=tooltip,
-    )
-
-    row3_col1, row3_col2 = st.columns([6, 1])
-
-    with row3_col1:
-        st.pydeck_chart(r)
-    with row3_col2:
-        st.write(
-            cm.create_colormap(
-                palette,
-                label=selected_col.replace("_", " ").title(),
-                width=0.2,
-                height=3,
-                orientation="vertical",
-                vmin=min_value,
-                vmax=max_value,
-                font_size=10,
-            )
-        )
-    row4_col1, row4_col2, row4_col3 = st.columns([1, 2, 3])
-    with row4_col1:
-        show_data = st.checkbox("Show raw data")
-    with row4_col2:
-        show_cols = st.multiselect("Select columns", data_cols)
-    with row4_col3:
-        show_colormaps = st.checkbox("Preview all color palettes")
-        if show_colormaps:
-            st.write(cm.plot_colormaps(return_fig=True))
-    if show_data:
-        if scale == "National":
-            st.dataframe(gdf[["NAME", "GEOID"] + show_cols])
-        elif scale == "State":
-            st.dataframe(gdf[["NAME", "STUSPS"] + show_cols])
-        elif scale == "County":
-            st.dataframe(gdf[["NAME", "STATEFP", "COUNTYFP"] + show_cols])
-        elif scale == "Metro":
-            st.dataframe(gdf[["NAME", "CBSAFP"] + show_cols])
-        elif scale == "Zip":
-            st.dataframe(gdf[["GEOID10"] + show_cols])
-
 
 app()
