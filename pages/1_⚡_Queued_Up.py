@@ -21,141 +21,36 @@ mkdwn_analysis = """
 
 st.sidebar.info(mkdwn_analysis)
 
-STREAMLIT_STATIC_PATH = pathlib.Path(st.__path__[0]) / "static"
-# We create a downloads directory within the streamlit static asset directory
-# and we write output files to it
-DOWNLOADS_PATH = STREAMLIT_STATIC_PATH / "downloads"
-if not DOWNLOADS_PATH.is_dir():
-    DOWNLOADS_PATH.mkdir()
-
-link_prefix = "https://raw.githubusercontent.com/giswqs/data/main/housing/"
+link_prefix = "https://raw.githubusercontent.com/kman2022/data/main/"
 
 data_links = {
-    "weekly": {
-        "national": link_prefix + "Core/listing_weekly_core_aggregate_by_country.csv",
-        "metro": link_prefix + "Core/listing_weekly_core_aggregate_by_metro.csv",
+    "trend": {
+        "status": link_prefix + "berkley/df_trend.csv",    
     },
-    "monthly_current": {
-        "national": link_prefix + "Core/RDC_Inventory_Core_Metrics_Country.csv",
-        "state": link_prefix + "Core/RDC_Inventory_Core_Metrics_State.csv",
-        "metro": link_prefix + "Core/RDC_Inventory_Core_Metrics_Metro.csv",
-        "county": link_prefix + "Core/RDC_Inventory_Core_Metrics_County.csv",
-        "zip": link_prefix + "Core/RDC_Inventory_Core_Metrics_Zip.csv",
+    "duration": {
+        "no_months": link_prefix + "berkley/df_trend_dur.csv",
     },
-    "monthly_historical": {
-        "national": link_prefix + "Core/RDC_Inventory_Core_Metrics_Country_History.csv",
-        "state": link_prefix + "Core/RDC_Inventory_Core_Metrics_State_History.csv",
-        "metro": link_prefix + "Core/RDC_Inventory_Core_Metrics_Metro_History.csv",
-        "county": link_prefix + "Core/RDC_Inventory_Core_Metrics_County_History.csv",
-        "zip": link_prefix + "Core/RDC_Inventory_Core_Metrics_Zip_History.csv",
-    },
-    "hotness": {
-        "metro": link_prefix
-        + "Hotness/RDC_Inventory_Hotness_Metrics_Metro_History.csv",
-        "county": link_prefix
-        + "Hotness/RDC_Inventory_Hotness_Metrics_County_History.csv",
-        "zip": link_prefix + "Hotness/RDC_Inventory_Hotness_Metrics_Zip_History.csv",
+    "historical": {
+        "data": link_prefix + "berkley/df_iq_clean.csv",
     },
 }
-
-def get_data_columns(df, category, frequency="monthly"):
-    if frequency == "monthly":
-        if category.lower() == "county":
-            del_cols = ["month_date_yyyymm", "county_fips", "county_name"]
-        elif category.lower() == "state":
-            del_cols = ["month_date_yyyymm", "state", "state_id"]
-        elif category.lower() == "national":
-            del_cols = ["month_date_yyyymm", "country"]
-        elif category.lower() == "metro":
-            del_cols = ["month_date_yyyymm", "cbsa_code", "cbsa_title", "HouseholdRank"]
-        elif category.lower() == "zip":
-            del_cols = ["month_date_yyyymm", "postal_code", "zip_name", "flag"]
-    elif frequency == "weekly":
-        if category.lower() == "national":
-            del_cols = ["week_end_date", "geo_country"]
-        elif category.lower() == "metro":
-            del_cols = ["week_end_date", "cbsa_code", "cbsa_title", "hh_rank"]
-
-    cols = df.columns.values.tolist()
-
-    for col in cols:
-        if col.strip() in del_cols:
-            cols.remove(col)
-    if category.lower() == "metro":
-        return cols[2:]
-    else:
-        return cols[1:]
-
 
 @st.cache_data
 def get_inventory_data(url):
     df = pd.read_csv(url)
     url = url.lower()
-    if "county" in url:
-        df["county_fips"] = df["county_fips"].map(str)
-        df["county_fips"] = df["county_fips"].str.zfill(5)
-    elif "state" in url:
-        df["STUSPS"] = df["state_id"].str.upper()
-    elif "metro" in url:
-        df["cbsa_code"] = df["cbsa_code"].map(str)
-    elif "zip" in url:
-        df["postal_code"] = df["postal_code"].map(str)
-        df["postal_code"] = df["postal_code"].str.zfill(5)
 
-    if "listing_weekly_core_aggregate_by_country" in url:
-        columns = get_data_columns(df, "national", "weekly")
-        for column in columns:
-            if column != "median_days_on_market_by_day_yy":
-                df[column] = df[column].str.rstrip("%").astype(float) / 100
-    if "listing_weekly_core_aggregate_by_metro" in url:
-        columns = get_data_columns(df, "metro", "weekly")
-        for column in columns:
-            if column != "median_days_on_market_by_day_yy":
-                df[column] = df[column].str.rstrip("%").astype(float) / 100
-        df["cbsa_code"] = df["cbsa_code"].str[:5]
     return df
-
-
-def filter_weekly_inventory(df, week):
-    df = df[df["week_end_date"] == week]
-    return df
-
-
-def get_start_end_year(df):
-    start_year = int(str(df["month_date_yyyymm"].min())[:4])
-    end_year = int(str(df["month_date_yyyymm"].max())[:4])
-    return start_year, end_year
-
-
-def get_periods(df):
-    return [str(d) for d in list(set(df["month_date_yyyymm"].tolist()))]
-
 
 @st.cache_data
 def get_geom_data(category):
 
     prefix = (
-        "https://raw.githubusercontent.com/giswqs/streamlit-geospatial/master/data/"
+        "https://raw.githubusercontent.com/kman2022/data/main/"
     )
     links = {
         "national": prefix + "us_nation.geojson",
-        "state": prefix + "us_states.geojson",
-        "county": prefix + "us_counties.geojson",
-        "metro": prefix + "us_metro_areas.geojson",
-        "zip": "https://www2.census.gov/geo/tiger/GENZ2018/shp/cb_2018_us_zcta510_500k.zip",
     }
-
-    if category.lower() == "zip":
-        r = requests.get(links[category])
-        out_zip = os.path.join(DOWNLOADS_PATH, "cb_2018_us_zcta510_500k.zip")
-        with open(out_zip, "wb") as code:
-            code.write(r.content)
-        zip_ref = zipfile.ZipFile(out_zip, "r")
-        zip_ref.extractall(DOWNLOADS_PATH)
-        gdf = gpd.read_file(out_zip.replace("zip", "shp"))
-    else:
-        gdf = gpd.read_file(links[category])
-    return gdf
 
 
 def join_attributes(gdf, df, category):

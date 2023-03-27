@@ -1,12 +1,13 @@
 import streamlit as st
 import leafmap.foliumap as leafmap
+from PIL import Image
 
-LOC_PATH = '/Users/kristian.lande@leveltenenergy.com/Documents/GitHub/streamlit-geospatial/data/'
-UC_IMAGE = 'berkley_logo.png'
-PWR_IMAGE = 'power_pic.jpeg'
+UC_IMAGE = 'https://github.com/kman2022/data/blob/main/main/berkley/berkley_logo.png'
+PWR_IMAGE = 'https://raw.githubusercontent.com/kman2022/data/main/main/berkley/power_pic.jpeg'
+PROCESS_IMAGE ='https://github.com/kman2022/data/blob/main/main/berkley/IQ_study_process_small%20copy.png?raw=true'
 
 st.set_page_config(page_title="Interconnection Dashboard",
-                   page_icon=LOC_PATH+UC_IMAGE,
+                   page_icon=UC_IMAGE,
                    layout="wide")
 
 # Customize the sidebar
@@ -28,20 +29,19 @@ st.markdown(
     This multipage app template demonstrates various interactive web apps created using [streamlit](https://streamlit.io) and [leafmap](https://leafmap.org). It is an open-source project and you are very welcome to contribute to the [GitHub repository](https://github.com/giswqs/streamlit-multipage-template).
     """
 )
-st.image(LOC_PATH+PWR_IMAGE,width=350)
+
+st.image(PWR_IMAGE,width=350)
 
 st.header("Instructions")
 
 instructions = """
-1. For the [GitHub repository](https://github.com/giswqs/streamlit-multipage-template) or [use it as a template](https://github.com/giswqs/streamlit-multipage-template/generate) for your own project.
-2. Customize the sidebar by changing the sidebar text and logo in each Python files.
-3. Find your favorite emoji from https://emojipedia.org.
-4. Add a new app to the `pages/` directory with an emoji in the file name, e.g., `1_🚀_Chart.py`.
-
+1. For the [GitHub repository](https://github.com/kman2022/streamlit-multipage-template), [data](https://github.com/kman2022/data/tree/main/main/berkley).
+2. Each tab represents a different Berkley Labs report.
+3. Scrapes have been built to interconnection queue data and this and other data can be added to this application.
+4. The interconnection queue process follows a simplified process. 
+5. Data for the detailed steps are not included.
+6. Not all regions report interconnection agreement dates and official online dates. The proposed online dates are used as a proxy for COD but the data quality may be poor as the information is often an estimation provided by the developer.
 """
 
 st.markdown(instructions)
-
-m = leafmap.Map(minimap_control=True)
-m.add_basemap("OpenTopoMap")
-m.to_streamlit(height=500)
+st.image(PROCESS_IMAGE)
