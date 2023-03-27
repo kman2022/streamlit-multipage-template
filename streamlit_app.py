@@ -39,7 +39,7 @@ instructions = """
 2. Each tab represents a different Berkley Labs report.
 3. Scrapes have been built to interconnection queue data and this and other data can be added to this application.
 4. The interconnection queue process follows a simplified process. 
-5. Data for the detailed steps are not included.
+5. Data for the detailed steps (Interconnection Studies) are not included in the saource data.
 6. Not all regions report interconnection agreement dates and official online dates. The proposed online dates are used as a proxy for COD but the data quality may be poor as the information is often an estimation provided by the developer.
 """
 

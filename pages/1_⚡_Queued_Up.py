@@ -38,7 +38,9 @@ def load_q_data():
     # trend
     df_trend = pd.read_csv(csv_trend, usecols=['q_year', 'q_status', 'cod_year', 'type_clean', 'mw1','region'])    
     # duration
-    df_dur = pd.read_csv(csv_duration)
+    df_dur = pd.read_csv(csv_duration, usecols=['q_year', 'q_status', 'cod_year', 'type_clean', 'mw1',
+       'region', 'ix_voltage', 'diff_months_ia', 'diff_months_cod',
+       'diff_months_wd'])
     # history
     df_hist = pd.read_csv(csv_duration)
     return df_trend, df_dur, df_hist
@@ -62,9 +64,7 @@ def app():
     """
     )
 
-    row1_col1, row1_col2, row1_col3 = st.columns(
-    [3.0, 3.0, 3.4]
-    )
+    row1_col1, row1_col2 = st.columns([3.0, 3.4])
     # Load regions
     region_list, default_region = regions(df_hist)
 
@@ -93,23 +93,26 @@ def app():
                 st.session_state.all_option = False
             return
 
-        selected_options_ft = st.multiselect("Select one or more options:",
+        selected_options_ft = st.sidebar.multiselect("Select one or more options:",
                 FUEL_LIST,key="selected_options", on_change=multi_change)
 
-        all_ft = st.checkbox("Select all", key='all_option',on_change= check_change)
-    
-    with row1_col2:
-        region_select = st.selectbox('Region:', region_list,index=default_region,help = 'Filter report to show the market region')
+        all_ft = st.sidebar.checkbox("Select all", key='all_option',on_change= check_change)
+    #############    
+        row2_col1, row2_col2, row1_col3 = st.columns([3.0, 3.0, 3.4])
 
-    with row1_col3:
-        qyear_select = st.selectbox("Online Year:",range(2001,2026),1,help = 'Filter report to show the year the project entered the queue')
-
-    row2_col1, row2_col2= st.columns([5,1])
-    #with st.expander("See a summary"):
     with row2_col1:
+        region_select = st.sidebar.selectbox('Region:', region_list,index=default_region,help = 'Filter report to show the market region.')
+
+    with row2_col2:
+        qyear_select = st.sidebar.slider("Enter queue year:",min_value=2001, max_value=2021,step=1, value = 2014, help = 'Filter report to show the year the project entered the queue.')
+    ############# 
+    with st.expander("See a trend by volume"):
+
+        row3_col1, row3_col2= st.columns([5,1])
+    with row3_col1:
         df_chart_trend = df_trend[(df_trend['region']==region_select)&(df_trend['type_clean'].isin(selected_options_ft))&(df_trend['q_year']>=qyear_select)]
         df_chart_trend = df_chart_trend[['q_year','q_status','mw1']]
-        row2_col1.subheader("Trend")
+        row3_col1.subheader("Trend: Total MW Volumes")
         bar_chart = alt.Chart(
                         df_chart_trend,
                     ).mark_bar().encode(
@@ -118,30 +121,72 @@ def app():
                         color = 'q_status:N'
                     )
         st.altair_chart(bar_chart, use_container_width=True)
+    ############# 
+    with st.expander("See a trend by count"):
 
-    # LOAD DATA
-    # df_trend, df_dur, df_hist = load_q_data()
-    # df_hist = fuel_types() 
-    # LOAD MAP AND FILTERS
-    # fuel_type = fuel_types(df_dur)
-    #region = region_select(df_dur)
-    #status_type = status_types(df_dur)
+        row4_col1, row4_col2= st.columns([5,1])
+    with row4_col1:
+        row4_col1.subheader("Trend: Total Count")
+        bar_chart = alt.Chart(
+                        df_chart_trend,
+                    ).mark_bar().encode(
+                        x = 'q_year:O',
+                        y = 'count(mw1):Q',
+                        color = 'q_status:N'
+                    )
+        st.altair_chart(bar_chart, use_container_width=True)
+        ############# 
+    with st.expander("See a trend by percent capacity"):
 
-    with row1_col4:
-        selected_col = st.selectbox("Attribute")
-    with row1_col5:
-        show_desc = st.checkbox("Show attribute description")
-        if show_desc:
-            try:
-                label, desc = get_data_dict(selected_col.strip())
-                markdown = f"""
-                **{label}**: {desc}
-                """
-                st.markdown(markdown)
-            except:
-                st.warning("No description available for selected attribute")
-    row2_col1, row2_col2, row2_col3, row2_col4, row2_col5, row2_col6 = st.columns(
-        [0.6, 0.68, 0.7, 0.7, 1.5, 0.8]
-    )
+        row5_col1, row4_col2= st.columns([5,1])
+    with row5_col1:
+        row5_col1.subheader("Trend: By percent capacity")
+        bar_chart = alt.Chart(
+                        df_chart_trend,
+                    ).mark_bar().encode(
+                        x = 'q_year:O',
+                        y = alt.Y('count(mw1):Q',stack='normalize'),
+                        color = 'q_status:N'
+                    )
+        st.altair_chart(bar_chart, use_container_width=True)
 
 app()
+
+df_trend = df_trend[['q_year', 'q_status', 'mw1','region']]
+df_trend = df_trend[(df_trend['q_year']>=2000)&(df_trend['q_year']<=2015)]
+reg_status_volume = df_trend.groupby(['region','q_status']).agg({'mw1':'sum'})
+reg_perc_vol = reg_status_volume.groupby(level=0).apply(lambda x: 100 * x/ float(x.sum()))
+
+reg_status_count = df_trend.groupby(['region','q_status']).agg({'mw1':'count'})
+reg_perc_count = reg_status_count.groupby(level=0).apply(lambda x: 100 * x/ float(x.sum()))
+st.markdown('#### Overview:')
+st.markdown('- PJM and MISO have the highest volume of projects completing each phase. Total volume decreases substantially across phases for most ISOs.')
+st.markdown('- Historical completion rates 2000-2015: PJM (29%), MISO (27%), ISONE (22%), CAISO (13%) and NYISO (18%). (page 30)')
+st.info('- This is misleading when viewed by volume: PJM (18%), MISO (19%), ISONE (23%), CAISO (10%) 📈')
+
+with st.expander("See a completion by region"):
+    st.code("""
+    reg_status_volume = df_trend.groupby(['region','q_status']).agg({'mw1':'sum'})
+    reg_perc = reg_status_volume.groupby(level=0).apply(lambda x: 100 * x/ float(x.sum()))
+    """, language="python")
+    row6_col1, row6_col2= st.columns([3,3])
+    row6_col1.subheader("Region by count")
+    row6_col1.dataframe(reg_perc_count)
+    row6_col2.subheader("Region by volume")
+    row6_col2.dataframe(reg_perc_vol)
+
+st.markdown('- In PJM, Phase 1 takes typically 2-3 months; Phase 3 takes 20-25 months.')
+st.markdown('- Only 27% of all projects requesting interconnection from 2000 to 2016 achieved commercial operation by year-end 2021.  📈')
+
+with st.expander("See a completion trend"):
+    st.code("""
+    def_dur_cod = df_dur[(df_dur['q_year']>=2000)&(df_dur['q_year']<=2016)&(df_dur['cod_year']<=2021)]
+    def_dur_count = def_dur_cod.groupby(['q_status']).agg({'mw1':'count'}) # 27%
+    """, language="python")
+    row7_col1, row7_col2= st.columns([3,3])
+    row6_col1.subheader("Region by count")
+    row6_col1.dataframe(reg_perc_count)
+    row6_col2.subheader("Region by volume")
+    row6_col2.dataframe(reg_perc_vol)
+
+st.markdown('- PJM embarked on a queue reform that was recently approved by FERC (2022) which includes a clustered, **“first-ready, first-serve”** approach, size-based study deposits, and increased readiness deposits that are at risk when projects withdraw later in the study process.')
