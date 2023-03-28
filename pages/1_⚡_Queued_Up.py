@@ -1,22 +1,37 @@
-import datetime
-import os
-import pathlib
-import zipfile
+# import datetime
+# import os
+# import pathlib
+# import zipfile
 import pandas as pd
-import pydeck as pdk
+# import pydeck as pdk
 import altair as alt
-import geopandas as gpd
+# import geopandas as gpd
 import streamlit as st
-import leafmap.colormaps as cm
-from leafmap.common import hex_to_rgb
+# import leafmap.colormaps as cm
+# from leafmap.common import hex_to_rgb
+from matplotlib import pyplot as plt
+import matplotlib.style as style
+
+style.use('fivethirtyeight')
+plt.rcParams['lines.linewidth'] = 1
+dpi = 1000
+plt.rcParams['font.size'] = 13
+plt.rcParams['font.sans-serif'] = 'Lato'
+plt.rcParams['axes.labelsize'] = plt.rcParams['font.size']
+plt.rcParams['axes.titlesize'] = plt.rcParams['font.size']
+plt.rcParams['legend.fontsize'] = plt.rcParams['font.size']
+plt.rcParams['xtick.labelsize'] = plt.rcParams['font.size']
+plt.rcParams['ytick.labelsize'] = plt.rcParams['font.size']
+plt.rcParams['figure.figsize'] = 8, 8
 
 st.set_page_config(page_title="Queued Up  ⚡",
                    page_icon='📈',
                    layout="wide")
+
 st.title("Queued Up  ⚡ ")
 
 mkdwn_analysis = """
-    **Source:** [Berkley Lab Queued Up v2](https://emp.lbl.gov/queues): Extended Analysis on Power Plants Seeking Transmission InterconnectionAs of the End of 2021. Joseph Rand, Will Gorman, Dev Millstein, Andrew Mills, Joachim Seel, Ryan Wiser Lawrence Berkeley National Laboratory. February 2022.  
+    **Source:** [Berkley Lab Queued Up v2](https://emp.lbl.gov/queues): Extended Analysis on Power Plants Seeking Transmission InterconnectionAs of the End of 2021. Joseph Rand, Will Gorman, Dev Millstein, Andrew Mills, Joachim Seel, Ryan Wiser Lawrence Berkeley National Laboratory. February 2022.
 """
 
 st.sidebar.info(mkdwn_analysis)
@@ -25,6 +40,7 @@ link_prefix = "https://raw.githubusercontent.com/kman2022/data/main/main/"
 csv_trend = link_prefix + "berkley/df_trend.csv"
 csv_duration = link_prefix + "berkley/df_trend_dur.csv"
 csv_q_hist = link_prefix + "berkley/df_iq_clean.csv"
+
 FUEL_LIST = ['Gas', 'Wind', 'Hydro', 'Solar', 'Other', 'Geothermal',
        'Other Storage', 'Nuclear', 'Wind+Battery', 'Solar+Battery',
        'Gas+Battery', 'Solar+Wind', 'Gas+Solar', 'Solar+Gas', 'Battery',
@@ -36,7 +52,7 @@ REGION_LIST = ['CAISO', 'ISO-NE', 'MISO', 'PJM', 'NYISO', 'SPP', 'ERCOT',
 @st.cache_data(persist=True)
 def load_q_data():
     # trend
-    df_trend = pd.read_csv(csv_trend, usecols=['q_year', 'q_status', 'cod_year', 'type_clean', 'mw1','region'])    
+    df_trend = pd.read_csv(csv_trend, usecols=['q_year', 'q_status', 'cod_year', 'type_clean', 'mw1','region'])
     # duration
     df_dur = pd.read_csv(csv_duration, usecols=['q_year', 'q_status', 'cod_year', 'type_clean', 'mw1',
        'region', 'ix_voltage', 'diff_months_ia', 'diff_months_cod',
@@ -57,7 +73,7 @@ def app():
     st.title("U.S. Interconnection Data and Market Trends")
     st.markdown(
         """**Introduction:** This interactive dashboard is designed for visualizing U.S. electrical interconnection data and trends at multiple levels (i.e., national,
-         state, county, and ISO). The data sources is from [Berkley Labs](https://emp.lbl.gov/queues) and 
+         state, county, and ISO). The data sources is from [Berkley Labs](https://emp.lbl.gov/queues) and
          [Cartographic Boundary Files](https://www.census.gov/geographies/mapping-files/time-series/geo/carto-boundary-file.html) from U.S. Census Bureau.
          Several open-source packages are used to process the data and generate the visualizations, e.g., [streamlit](https://streamlit.io),
           [geopandas](https://geopandas.org), [leafmap](https://leafmap.org), and [pydeck](https://deckgl.readthedocs.io).
@@ -76,7 +92,7 @@ def app():
             st.session_state.selected_options = FUEL_LIST
 
         def check_change():
-        # this runs BEFORE the rest of the script when a change is detected 
+        # this runs BEFORE the rest of the script when a change is detected
         # from your checkbox to set selectbox
             if st.session_state.all_option:
                 st.session_state.selected_options = FUEL_LIST
@@ -97,7 +113,7 @@ def app():
                 FUEL_LIST,key="selected_options", on_change=multi_change)
 
         all_ft = st.sidebar.checkbox("Select all", key='all_option',on_change= check_change)
-    #############    
+    #############
         row2_col1, row2_col2, row1_col3 = st.columns([3.0, 3.0, 3.4])
 
     with row2_col1:
@@ -105,14 +121,14 @@ def app():
 
     with row2_col2:
         qyear_select = st.sidebar.slider("Enter queue year:",min_value=2001, max_value=2021,step=1, value = 2014, help = 'Filter report to show the year the project entered the queue.')
-    ############# 
-    with st.expander("See a trend by volume"):
+    #############
+    with st.expander("See chart trend by volume"):
 
         row3_col1, row3_col2= st.columns([5,1])
     with row3_col1:
         df_chart_trend = df_trend[(df_trend['region']==region_select)&(df_trend['type_clean'].isin(selected_options_ft))&(df_trend['q_year']>=qyear_select)]
         df_chart_trend = df_chart_trend[['q_year','q_status','mw1']]
-        row3_col1.subheader("Trend: Total MW Volumes")
+        row3_col1.subheader("Trend: volume")
         bar_chart = alt.Chart(
                         df_chart_trend,
                     ).mark_bar().encode(
@@ -121,12 +137,12 @@ def app():
                         color = 'q_status:N'
                     )
         st.altair_chart(bar_chart, use_container_width=True)
-    ############# 
-    with st.expander("See a trend by count"):
+    #############
+    with st.expander("See chart trend by count"):
 
         row4_col1, row4_col2= st.columns([5,1])
     with row4_col1:
-        row4_col1.subheader("Trend: Total Count")
+        row4_col1.subheader("Trend: count")
         bar_chart = alt.Chart(
                         df_chart_trend,
                     ).mark_bar().encode(
@@ -135,12 +151,12 @@ def app():
                         color = 'q_status:N'
                     )
         st.altair_chart(bar_chart, use_container_width=True)
-        ############# 
-    with st.expander("See a trend by percent capacity"):
+        #############
+    with st.expander("See chart trend by percent capacity"):
 
         row5_col1, row4_col2= st.columns([5,1])
     with row5_col1:
-        row5_col1.subheader("Trend: By percent capacity")
+        row5_col1.subheader("Trend: percent capacity")
         bar_chart = alt.Chart(
                         df_chart_trend,
                     ).mark_bar().encode(
@@ -152,41 +168,108 @@ def app():
 
 app()
 
-df_trend = df_trend[['q_year', 'q_status', 'mw1','region']]
-df_trend = df_trend[(df_trend['q_year']>=2000)&(df_trend['q_year']<=2015)]
-reg_status_volume = df_trend.groupby(['region','q_status']).agg({'mw1':'sum'})
-reg_perc_vol = reg_status_volume.groupby(level=0).apply(lambda x: 100 * x/ float(x.sum()))
+df_tr = df_trend[['q_year', 'q_status', 'mw1','region']]
+df_tr = df_tr[(df_tr['q_year']>=2000)&(df_tr['q_year']<=2015)]
 
-reg_status_count = df_trend.groupby(['region','q_status']).agg({'mw1':'count'})
-reg_perc_count = reg_status_count.groupby(level=0).apply(lambda x: 100 * x/ float(x.sum()))
-st.markdown('#### Overview:')
+reg_status_count = df_tr.groupby(['region','q_status']).agg({'q_status':'count'},group_keys=False)
+reg_status_count_tot =df_tr.groupby(['region']).agg({'q_status':'count'},group_keys=False)
+reg_perc_count = reg_status_count.div(reg_status_count_tot,level=0) * 100
+
+reg_status_volume = df_trend.groupby(['region','q_status']).agg({'mw1':'sum'},group_keys=False)
+reg_status_volume_tot =df_trend.groupby(['region']).agg({'mw1':'sum'},group_keys=False)
+reg_perc_volume = reg_status_volume.div(reg_status_volume_tot,level=0) * 100
+
+st.markdown('### Overview')
+st.markdown('#### Trends:')
 st.markdown('- PJM and MISO have the highest volume of projects completing each phase. Total volume decreases substantially across phases for most ISOs.')
 st.markdown('- Historical completion rates 2000-2015: PJM (29%), MISO (27%), ISONE (22%), CAISO (13%) and NYISO (18%). (page 30)')
 st.info('- This is misleading when viewed by volume: PJM (18%), MISO (19%), ISONE (23%), CAISO (10%) 📈')
 
-with st.expander("See a completion by region"):
-    st.code("""
-    reg_status_volume = df_trend.groupby(['region','q_status']).agg({'mw1':'sum'})
-    reg_perc = reg_status_volume.groupby(level=0).apply(lambda x: 100 * x/ float(x.sum()))
-    """, language="python")
-    row6_col1, row6_col2= st.columns([3,3])
-    row6_col1.subheader("Region by count")
-    row6_col1.dataframe(reg_perc_count)
-    row6_col2.subheader("Region by volume")
-    row6_col2.dataframe(reg_perc_vol)
+with st.expander("See tabular completion by region"):
+    st.code('''# p30 Completion (COD) Percentage of Queued Projects for IRs from 2000-2015
+        df_trend = df_trend[['q_year', 'q_status', 'mw1','region']]
+        df_trend = df_trend[(df_trend['q_year']>=2000)&(df_trend['q_year']<=2015)]
+        reg_status_volume = df_trend.groupby(['region','q_status']).agg({'mw1':'sum'})
+        reg_perc_vol = reg_status_volume.groupby(level=0).apply(lambda x: 100 * x/ float(x.sum()))
+    ''', language="python")
+    row6_col1, row6_col2= st.columns([1,1])
+    row6_col1.caption("Region by count")
+    row6_col1.table(reg_perc_count[['q_status']].style.format('{:.1f}', na_rep="")\
+         .bar(align=0, vmin=-2.5, vmax=2.5, cmap="bwr", height=50,
+              width=60, props="width: 120px; border-right: 1px solid black;")\
+         .text_gradient(cmap="bwr", vmin=-2.5, vmax=2.5))
+    row6_col2.caption("Region by volume")
+    row6_col2.table(reg_perc_volume[['mw1']].style.format('{:.1f}', na_rep="")\
+         .bar(align=0, vmin=-2.5, vmax=2.5, cmap="bwr", height=50,
+              width=60, props="width: 120px; border-right: 1px solid black;")\
+         .text_gradient(cmap="bwr", vmin=-2.5, vmax=2.5))
+        
+st.markdown('- Only 27% of all projects requesting interconnection from 2000 to 2016 achieved commercial operation by year-end 2021. (page 2 PJM Costs)')
+st.info('- While unable to tie out the number exactly it misses the trend and wide variation between markets 📈')
 
+df_tr1 = df_trend[['q_year', 'cod_year','q_status', 'mw1','region']]
+def_cod = df_tr1[(df_tr1['q_year']>=2000)&(df_tr1['q_year']<=2016)&(df_tr1['cod_year']<=2021)&(df_tr1['cod_year']>=2000)]
+
+def_cod_count_yr = def_cod.groupby(['cod_year','q_status']).agg({'q_status':'count'}) # 27%
+def_cod_count_tot_yr = def_cod.groupby(['cod_year']).agg({'q_status':'count'})
+def_perc_cod_count_yr = def_cod_count_yr.div(def_cod_count_tot_yr,level=0) * 100
+
+def_perc_cod_trend = def_perc_cod_count_yr[def_perc_cod_count_yr.index.isin(['operational'], level=1)]
+
+def_reg_count = def_cod.groupby(['cod_year','region','q_status']).agg({'mw1':'count'})
+def_reg_count = def_reg_count.reset_index()
+def_reg_count = def_reg_count.set_index(['cod_year','region'])
+def_cod_count_tot = def_cod.groupby(['cod_year','region']).agg({'mw1':'count'})
+
+df_cod = def_reg_count.join(def_cod_count_tot,lsuffix='_s', rsuffix='_t')
+df_cod['perc'] = df_cod.mw1_s/df_cod.mw1_t
+
+with st.expander("See tabular operational trend"):
+    st.code("""
+        def_cod = df_trend[(df_tr1['q_year']>=2000)&(df_tr1['q_year']<=2016)&(df_tr1['cod_year']<=2021)]
+        def_cod_count = def_cod.groupby(['q_status']).agg({'mw1':'count'}) # 24%
+        def_cod_count_tot = def_cod.agg({'mw1':'count'})
+        def_perc_cod_count = def_cod_count.div(def_cod_count_tot,level='mw1') * 100
+    """, language="python")
+    row7_col1, row7_col2= st.columns([1,1])
+    row7_col1.caption("Trend overall operational count")
+    row7_col1.dataframe(def_perc_cod_trend)
+    row7_col2.caption("Trend overall regional operational count")
+    row7_col2.dataframe(df_cod)
+    
+#############
+with st.expander("See chart operational trend"):
+    row8_col1, row8_col2= st.columns([5,1])
+    chart_cod = def_perc_cod_trend.reset_index('q_status',drop=True)  
+    row8_col1.line_chart(chart_cod, use_container_width=True)
+
+    row9_col1, row8_col2= st.columns([5,1])
+    chart_region_cod = df_cod[df_cod['q_status']=='operational']
+    chart_region_cod = chart_region_cod.reset_index()
+    chart_region_cod.drop(labels=['q_status','mw1_s','mw1_t'],axis=1,inplace=True)
+    chart = alt.Chart(chart_region_cod).mark_line().encode(
+              x=alt.X('cod_year:O'),
+              y=alt.Y('perc:Q'),
+              color=alt.Color('region:N')
+            ).properties(title="The queues are growing as evidenced by the perc operational status")
+    row9_col1.altair_chart(chart, use_container_width=True)
+
+st.markdown('#### Duration:')
+st.markdown('- The duration from interconnection request (IR) to COD is increasing, averaging ~4 years since 2016.')
+
+chart_dur = df_dur[['q_year','mw1','diff_months_cod']]
+chart_dur = chart_dur[chart_dur['q_year']>2008]
+chart_dur_vol = chart_dur.groupby('q_year').agg({'diff_months_cod':'mean','mw1':'sum'})
+
+st.header("Selection bias: successful projects have not seen their duration significantly increase")
+st.subheader("Berkley Labs 2021")
+latest_day_data = chart_dur_vol.diff_months_cod.iloc[-1]
+st.text(f"2021 mean duration: {latest_day_data:.2f}")
+st.subheader("Historical Data")
+st.line_chart(chart_dur_vol.diff_months_cod)
+volume = chart_dur_vol.mw1
+st.bar_chart(volume)
+
+st.markdown('- But durations from IR to interconnection agreement (IA) have been mostly steady at 2-3 years in the last decade')
 st.markdown('- In PJM, Phase 1 takes typically 2-3 months; Phase 3 takes 20-25 months.')
-st.markdown('- Only 27% of all projects requesting interconnection from 2000 to 2016 achieved commercial operation by year-end 2021.  📈')
-
-with st.expander("See a completion trend"):
-    st.code("""
-    def_dur_cod = df_dur[(df_dur['q_year']>=2000)&(df_dur['q_year']<=2016)&(df_dur['cod_year']<=2021)]
-    def_dur_count = def_dur_cod.groupby(['q_status']).agg({'mw1':'count'}) # 27%
-    """, language="python")
-    row7_col1, row7_col2= st.columns([3,3])
-    row6_col1.subheader("Region by count")
-    row6_col1.dataframe(reg_perc_count)
-    row6_col2.subheader("Region by volume")
-    row6_col2.dataframe(reg_perc_vol)
-
-st.markdown('- PJM embarked on a queue reform that was recently approved by FERC (2022) which includes a clustered, **“first-ready, first-serve”** approach, size-based study deposits, and increased readiness deposits that are at risk when projects withdraw later in the study process.')
+st.markdown('- Many markets including PJM are embarking on queue reform whuch has been encouraged and approved by FERC (2022). This includes a clustered, **“first-ready, first-serve”** approach, size-based study deposits, and increased readiness deposits that are at risk when projects withdraw later in the study process.')
