@@ -5,10 +5,10 @@
 import pandas as pd
 # import pydeck as pdk
 import altair as alt
-# import geopandas as gpd
+import geopandas as gpd
 import streamlit as st
-# import leafmap.colormaps as cm
-# from leafmap.common import hex_to_rgb
+import leafmap.colormaps as cm
+from leafmap.common import hex_to_rgb
 from matplotlib import pyplot as plt
 import matplotlib.style as style
 
@@ -40,6 +40,7 @@ link_prefix = "https://raw.githubusercontent.com/kman2022/data/main/main/"
 csv_trend = link_prefix + "berkley/df_trend.csv"
 csv_duration = link_prefix + "berkley/df_trend_dur.csv"
 csv_q_hist = link_prefix + "berkley/df_iq_clean.csv"
+gj_iq_geo = link_prefix + "gdp_iq_qeo.geojson"
 
 FUEL_LIST = ['Gas', 'Wind', 'Hydro', 'Solar', 'Other', 'Geothermal',
        'Other Storage', 'Nuclear', 'Wind+Battery', 'Solar+Battery',
@@ -261,15 +262,44 @@ chart_dur = df_dur[['q_year','mw1','diff_months_cod']]
 chart_dur = chart_dur[chart_dur['q_year']>2008]
 chart_dur_vol = chart_dur.groupby('q_year').agg({'diff_months_cod':'mean','mw1':'sum'})
 
-st.header("Selection bias: successful projects have not seen their duration significantly increase")
-st.subheader("Berkley Labs 2021")
-latest_day_data = chart_dur_vol.diff_months_cod.iloc[-1]
-st.text(f"2021 mean duration: {latest_day_data:.2f}")
-st.subheader("Historical Data")
-st.line_chart(chart_dur_vol.diff_months_cod)
-volume = chart_dur_vol.mw1
-st.bar_chart(volume)
+#############
+with st.expander("See chart operational trend"):
+    row10_col1, row10_col2= st.columns([5,1])
+    row11_col1, row11_col2= st.columns([5,1])    
+    st.header("Selection bias: successful projects have not seen their duration significantly increase")
+    st.subheader("Berkley Labs 2021")
+    latest_day_data = chart_dur_vol.diff_months_cod.iloc[-1]
+    st.text(f"2021 mean duration: {latest_day_data:.2f}")
+    st.subheader("Historical Data")
+    row10_col1.line_chart(chart_dur_vol.diff_months_cod)
+    volume = chart_dur_vol.mw1
+    row11_col1.bar_chart(volume)
 
 st.markdown('- But durations from IR to interconnection agreement (IA) have been mostly steady at 2-3 years in the last decade')
 st.markdown('- In PJM, Phase 1 takes typically 2-3 months; Phase 3 takes 20-25 months.')
 st.markdown('- Many markets including PJM are embarking on queue reform whuch has been encouraged and approved by FERC (2022). This includes a clustered, **“first-ready, first-serve”** approach, size-based study deposits, and increased readiness deposits that are at risk when projects withdraw later in the study process.')
+
+st.markdown('#### Map:')
+st.markdown('- roughly 18% of the records did not have a geoloc including 15% operational status listed projects.')
+
+row12_col1, row12_col2, row12_col3, row12_col4, row12_col5, row12_col6 = st.columns([1,1,1,1,1,1])
+palettes = cm.list_colormaps()
+with row12_col1:
+    palette = st.selectbox("Color palette", palettes, index=palettes.index("Blues"))
+with row12_col2:
+    n_colors = st.slider("Number of colors", min_value=2, max_value=20, value=8)
+with row12_col3:
+    show_nodata = st.checkbox("Show nodata areas", value=True)
+with row12_col4:
+    show_3d = st.checkbox("Show 3D view", value=False)
+with row12_col5:
+    if show_3d:
+        elev_scale = st.slider(
+            "Elevation scale", min_value=1, max_value=1000000, value=1, step=10
+        )
+        with row12_col6:
+            st.info("Press Ctrl and move the left mouse button.")
+    else:
+        elev_scale = 1
+
+
