@@ -1,9 +1,6 @@
-# import datetime
-# import os
-# import pathlib
-# import zipfile
+
 import pandas as pd
-# import pydeck as pdk
+import pydeck as pdk
 import altair as alt
 import geopandas as gpd
 import streamlit as st
@@ -40,7 +37,7 @@ link_prefix = "https://raw.githubusercontent.com/kman2022/data/main/main/"
 csv_trend = link_prefix + "berkley/df_trend.csv"
 csv_duration = link_prefix + "berkley/df_trend_dur.csv"
 csv_q_hist = link_prefix + "berkley/df_iq_clean.csv"
-gj_iq_geo = link_prefix + "gdp_iq_qeo.geojson"
+gj_iq_geo = link_prefix + "berkley/gdp_iq_qeo.geojson"
 
 FUEL_LIST = ['Gas', 'Wind', 'Hydro', 'Solar', 'Other', 'Geothermal',
        'Other Storage', 'Nuclear', 'Wind+Battery', 'Solar+Battery',
@@ -60,10 +57,12 @@ def load_q_data():
        'diff_months_wd'])
     # history
     df_hist = pd.read_csv(csv_duration)
-    return df_trend, df_dur, df_hist
+    # geoloc file
+    gdf = gpd.read_file(gj_iq_geo)
+    return df_trend, df_dur, df_hist, gdf
 
 # Load data
-df_trend, df_dur, df_hist = load_q_data()
+df_trend, df_dur, df_hist, gdp_iq_qeo = load_q_data()
 
 def regions(df):
     region_list = list(df['region'].unique())
@@ -114,8 +113,9 @@ def app():
                 FUEL_LIST,key="selected_options", on_change=multi_change)
 
         all_ft = st.sidebar.checkbox("Select all", key='all_option',on_change= check_change)
+
     #############
-        row2_col1, row2_col2, row1_col3 = st.columns([3.0, 3.0, 3.4])
+    row2_col1, row2_col2, row1_col3 = st.columns([3.0, 3.0, 3.4])
 
     with row2_col1:
         region_select = st.sidebar.selectbox('Region:', region_list,index=default_region,help = 'Filter report to show the market region.')
@@ -153,7 +153,7 @@ def app():
                     )
         st.altair_chart(bar_chart, use_container_width=True)
         #############
-    with st.expander("See chart trend by percent capacity"):
+    with st.expander("See chart trend by status breakout"):
 
         row5_col1, row4_col2= st.columns([5,1])
     with row5_col1:
@@ -167,139 +167,118 @@ def app():
                     )
         st.altair_chart(bar_chart, use_container_width=True)
 
+    df_tr = df_trend[['q_year', 'q_status', 'mw1','region']]
+    df_tr = df_tr[(df_tr['q_year']>=2000)&(df_tr['q_year']<=2015)]
+
+    reg_status_count = df_tr.groupby(['region','q_status']).agg({'q_status':'count'},group_keys=False)
+    reg_status_count_tot =df_tr.groupby(['region']).agg({'q_status':'count'},group_keys=False)
+    reg_perc_count = reg_status_count.div(reg_status_count_tot,level=0) * 100
+
+    reg_status_volume = df_trend.groupby(['region','q_status']).agg({'mw1':'sum'},group_keys=False)
+    reg_status_volume_tot =df_trend.groupby(['region']).agg({'mw1':'sum'},group_keys=False)
+    reg_perc_volume = reg_status_volume.div(reg_status_volume_tot,level=0) * 100
+
+    st.header('Overview')
+    st.subheader('Trends:')
+    st.markdown('- PJM and MISO have the highest volume of projects completing each phase. Total volume decreases substantially across phases for most ISOs.')
+    st.markdown('- Historical completion rates 2000-2015: PJM (29%), MISO (27%), ISONE (22%), CAISO (13%) and NYISO (18%). (page 30)')
+    st.info('- This is misleading when viewed by volume: PJM (18%), MISO (19%), ISONE (23%), CAISO (10%) 📈')
+
+    with st.expander("See tabular completion by region"):
+        st.code('''# p30 Completion (COD) Percentage of Queued Projects for IRs from 2000-2015
+            df_trend = df_trend[['q_year', 'q_status', 'mw1','region']]
+            df_trend = df_trend[(df_trend['q_year']>=2000)&(df_trend['q_year']<=2015)]
+            reg_status_volume = df_trend.groupby(['region','q_status']).agg({'mw1':'sum'})
+            reg_perc_vol = reg_status_volume.groupby(level=0).apply(lambda x: 100 * x/ float(x.sum()))
+        ''', language="python")
+        row6_col1, row6_col2= st.columns([1,1])
+        row6_col1.caption("Region by count")
+        row6_col1.table(reg_perc_count[['q_status']].style.format('{:.1f}', na_rep="")\
+             .bar(align=0, vmin=-2.5, vmax=2.5, cmap="bwr", height=50,
+                  width=60, props="width: 120px; border-right: 1px solid black;")\
+             .text_gradient(cmap="bwr", vmin=-2.5, vmax=2.5))
+        row6_col2.caption("Region by volume")
+        row6_col2.table(reg_perc_volume[['mw1']].style.format('{:.1f}', na_rep="")\
+             .bar(align=0, vmin=-2.5, vmax=2.5, cmap="bwr", height=50,
+                  width=60, props="width: 120px; border-right: 1px solid black;")\
+             .text_gradient(cmap="bwr", vmin=-2.5, vmax=2.5))
+
+    st.markdown('- Only 27% of all projects requesting interconnection from 2000 to 2016 achieved commercial operation by year-end 2021. (page 2 PJM Costs)')
+    st.info('- While unable to tie out the number exactly it misses the trend and wide variation between markets 📈')
+
+    df_tr1 = df_trend[['q_year', 'cod_year','q_status', 'mw1','region']]
+    def_cod = df_tr1[(df_tr1['q_year']>=2000)&(df_tr1['q_year']<=2016)&(df_tr1['cod_year']<=2021)&(df_tr1['cod_year']>=2000)]
+
+    def_cod_count_yr = def_cod.groupby(['cod_year','q_status']).agg({'q_status':'count'}) # 27%
+    def_cod_count_tot_yr = def_cod.groupby(['cod_year']).agg({'q_status':'count'})
+    def_perc_cod_count_yr = def_cod_count_yr.div(def_cod_count_tot_yr,level=0) * 100
+
+    def_perc_cod_trend = def_perc_cod_count_yr[def_perc_cod_count_yr.index.isin(['operational'], level=1)]
+
+    def_reg_count = def_cod.groupby(['cod_year','region','q_status']).agg({'mw1':'count'})
+    def_reg_count = def_reg_count.reset_index()
+    def_reg_count = def_reg_count.set_index(['cod_year','region'])
+    def_cod_count_tot = def_cod.groupby(['cod_year','region']).agg({'mw1':'count'})
+
+    df_cod = def_reg_count.join(def_cod_count_tot,lsuffix='_s', rsuffix='_t')
+    df_cod['perc'] = df_cod.mw1_s/df_cod.mw1_t
+
+    with st.expander("See tabular operational trend"):
+        st.code("""
+            def_cod = df_trend[(df_tr1['q_year']>=2000)&(df_tr1['q_year']<=2016)&(df_tr1['cod_year']<=2021)]
+            def_cod_count = def_cod.groupby(['q_status']).agg({'mw1':'count'}) # 24%
+            def_cod_count_tot = def_cod.agg({'mw1':'count'})
+            def_perc_cod_count = def_cod_count.div(def_cod_count_tot,level='mw1') * 100
+        """, language="python")
+        row7_col1, row7_col2= st.columns([1,1])
+        row7_col1.caption("Trend overall operational count")
+        row7_col1.dataframe(def_perc_cod_trend)
+        row7_col2.caption("Trend overall regional operational count")
+        row7_col2.dataframe(df_cod)
+
+    #############
+    with st.expander("See chart operational trend"):
+        row8_col1, row8_col2= st.columns([5,1])
+        chart_cod = def_perc_cod_trend.reset_index('q_status',drop=True)
+        row8_col1.line_chart(chart_cod, use_container_width=True)
+
+        row9_col1, row8_col2= st.columns([5,1])
+        chart_region_cod = df_cod[df_cod['q_status']=='operational']
+        chart_region_cod = chart_region_cod.reset_index()
+        chart_region_cod.drop(labels=['q_status','mw1_s','mw1_t'],axis=1,inplace=True)
+        chart = alt.Chart(chart_region_cod).mark_line().encode(
+                  x=alt.X('cod_year:O'),
+                  y=alt.Y('perc:Q'),
+                  color=alt.Color('region:N')
+                ).properties(title="The queues are growing as evidenced by the perc operational status")
+        row9_col1.altair_chart(chart, use_container_width=True)
+
+    st.subheader('Duration:')
+    st.markdown('- The duration from interconnection request (IR) to COD is increasing, averaging ~4 years since 2016.')
+
+    chart_dur = df_dur[['q_year','mw1','diff_months_cod']]
+    chart_dur = chart_dur[chart_dur['q_year']>2008]
+    chart_dur_vol = chart_dur.groupby('q_year').agg({'diff_months_cod':'mean','mw1':'sum'})
+
+        #############
+    with st.expander("See chart operational trend"):
+        row10_col1, row10_col2= st.columns([5,1])
+        row11_col1, row11_col2= st.columns([5,1])
+        st.header("Selection bias: successful projects have not seen their duration significantly increase")
+        st.subheader("Berkley Labs 2021")
+        latest_day_data = chart_dur_vol.diff_months_cod.iloc[-1]
+        st.text(f"2021 mean duration: {latest_day_data:.2f}")
+        st.subheader("Historical Data")
+        row10_col1.line_chart(chart_dur_vol.diff_months_cod)
+        volume = chart_dur_vol.mw1
+        row11_col1.bar_chart(volume)
+
+    st.markdown('- But durations from IR to interconnection agreement (IA) have been mostly steady at 2-3 years in the last decade')
+    st.markdown('- In PJM, Phase 1 takes typically 2-3 months; Phase 3 takes 20-25 months.')
+    st.markdown('- Many markets including PJM are embarking on queue reform whuch has been encouraged and approved by FERC (2022). This includes a clustered, **“first-ready, first-serve”** approach, size-based study deposits, and increased readiness deposits that are at risk when projects withdraw later in the study process.')
+    st.markdown('#### Map:')
+    st.markdown('- roughly 18% of the records did not have a geoloc including 15% operational status listed projects.')
 app()
 
-df_tr = df_trend[['q_year', 'q_status', 'mw1','region']]
-df_tr = df_tr[(df_tr['q_year']>=2000)&(df_tr['q_year']<=2015)]
-
-reg_status_count = df_tr.groupby(['region','q_status']).agg({'q_status':'count'},group_keys=False)
-reg_status_count_tot =df_tr.groupby(['region']).agg({'q_status':'count'},group_keys=False)
-reg_perc_count = reg_status_count.div(reg_status_count_tot,level=0) * 100
-
-reg_status_volume = df_trend.groupby(['region','q_status']).agg({'mw1':'sum'},group_keys=False)
-reg_status_volume_tot =df_trend.groupby(['region']).agg({'mw1':'sum'},group_keys=False)
-reg_perc_volume = reg_status_volume.div(reg_status_volume_tot,level=0) * 100
-
-st.markdown('### Overview')
-st.markdown('#### Trends:')
-st.markdown('- PJM and MISO have the highest volume of projects completing each phase. Total volume decreases substantially across phases for most ISOs.')
-st.markdown('- Historical completion rates 2000-2015: PJM (29%), MISO (27%), ISONE (22%), CAISO (13%) and NYISO (18%). (page 30)')
-st.info('- This is misleading when viewed by volume: PJM (18%), MISO (19%), ISONE (23%), CAISO (10%) 📈')
-
-with st.expander("See tabular completion by region"):
-    st.code('''# p30 Completion (COD) Percentage of Queued Projects for IRs from 2000-2015
-        df_trend = df_trend[['q_year', 'q_status', 'mw1','region']]
-        df_trend = df_trend[(df_trend['q_year']>=2000)&(df_trend['q_year']<=2015)]
-        reg_status_volume = df_trend.groupby(['region','q_status']).agg({'mw1':'sum'})
-        reg_perc_vol = reg_status_volume.groupby(level=0).apply(lambda x: 100 * x/ float(x.sum()))
-    ''', language="python")
-    row6_col1, row6_col2= st.columns([1,1])
-    row6_col1.caption("Region by count")
-    row6_col1.table(reg_perc_count[['q_status']].style.format('{:.1f}', na_rep="")\
-         .bar(align=0, vmin=-2.5, vmax=2.5, cmap="bwr", height=50,
-              width=60, props="width: 120px; border-right: 1px solid black;")\
-         .text_gradient(cmap="bwr", vmin=-2.5, vmax=2.5))
-    row6_col2.caption("Region by volume")
-    row6_col2.table(reg_perc_volume[['mw1']].style.format('{:.1f}', na_rep="")\
-         .bar(align=0, vmin=-2.5, vmax=2.5, cmap="bwr", height=50,
-              width=60, props="width: 120px; border-right: 1px solid black;")\
-         .text_gradient(cmap="bwr", vmin=-2.5, vmax=2.5))
-        
-st.markdown('- Only 27% of all projects requesting interconnection from 2000 to 2016 achieved commercial operation by year-end 2021. (page 2 PJM Costs)')
-st.info('- While unable to tie out the number exactly it misses the trend and wide variation between markets 📈')
-
-df_tr1 = df_trend[['q_year', 'cod_year','q_status', 'mw1','region']]
-def_cod = df_tr1[(df_tr1['q_year']>=2000)&(df_tr1['q_year']<=2016)&(df_tr1['cod_year']<=2021)&(df_tr1['cod_year']>=2000)]
-
-def_cod_count_yr = def_cod.groupby(['cod_year','q_status']).agg({'q_status':'count'}) # 27%
-def_cod_count_tot_yr = def_cod.groupby(['cod_year']).agg({'q_status':'count'})
-def_perc_cod_count_yr = def_cod_count_yr.div(def_cod_count_tot_yr,level=0) * 100
-
-def_perc_cod_trend = def_perc_cod_count_yr[def_perc_cod_count_yr.index.isin(['operational'], level=1)]
-
-def_reg_count = def_cod.groupby(['cod_year','region','q_status']).agg({'mw1':'count'})
-def_reg_count = def_reg_count.reset_index()
-def_reg_count = def_reg_count.set_index(['cod_year','region'])
-def_cod_count_tot = def_cod.groupby(['cod_year','region']).agg({'mw1':'count'})
-
-df_cod = def_reg_count.join(def_cod_count_tot,lsuffix='_s', rsuffix='_t')
-df_cod['perc'] = df_cod.mw1_s/df_cod.mw1_t
-
-with st.expander("See tabular operational trend"):
-    st.code("""
-        def_cod = df_trend[(df_tr1['q_year']>=2000)&(df_tr1['q_year']<=2016)&(df_tr1['cod_year']<=2021)]
-        def_cod_count = def_cod.groupby(['q_status']).agg({'mw1':'count'}) # 24%
-        def_cod_count_tot = def_cod.agg({'mw1':'count'})
-        def_perc_cod_count = def_cod_count.div(def_cod_count_tot,level='mw1') * 100
-    """, language="python")
-    row7_col1, row7_col2= st.columns([1,1])
-    row7_col1.caption("Trend overall operational count")
-    row7_col1.dataframe(def_perc_cod_trend)
-    row7_col2.caption("Trend overall regional operational count")
-    row7_col2.dataframe(df_cod)
-    
-#############
-with st.expander("See chart operational trend"):
-    row8_col1, row8_col2= st.columns([5,1])
-    chart_cod = def_perc_cod_trend.reset_index('q_status',drop=True)  
-    row8_col1.line_chart(chart_cod, use_container_width=True)
-
-    row9_col1, row8_col2= st.columns([5,1])
-    chart_region_cod = df_cod[df_cod['q_status']=='operational']
-    chart_region_cod = chart_region_cod.reset_index()
-    chart_region_cod.drop(labels=['q_status','mw1_s','mw1_t'],axis=1,inplace=True)
-    chart = alt.Chart(chart_region_cod).mark_line().encode(
-              x=alt.X('cod_year:O'),
-              y=alt.Y('perc:Q'),
-              color=alt.Color('region:N')
-            ).properties(title="The queues are growing as evidenced by the perc operational status")
-    row9_col1.altair_chart(chart, use_container_width=True)
-
-st.markdown('#### Duration:')
-st.markdown('- The duration from interconnection request (IR) to COD is increasing, averaging ~4 years since 2016.')
-
-chart_dur = df_dur[['q_year','mw1','diff_months_cod']]
-chart_dur = chart_dur[chart_dur['q_year']>2008]
-chart_dur_vol = chart_dur.groupby('q_year').agg({'diff_months_cod':'mean','mw1':'sum'})
-
-#############
-with st.expander("See chart operational trend"):
-    row10_col1, row10_col2= st.columns([5,1])
-    row11_col1, row11_col2= st.columns([5,1])    
-    st.header("Selection bias: successful projects have not seen their duration significantly increase")
-    st.subheader("Berkley Labs 2021")
-    latest_day_data = chart_dur_vol.diff_months_cod.iloc[-1]
-    st.text(f"2021 mean duration: {latest_day_data:.2f}")
-    st.subheader("Historical Data")
-    row10_col1.line_chart(chart_dur_vol.diff_months_cod)
-    volume = chart_dur_vol.mw1
-    row11_col1.bar_chart(volume)
-
-st.markdown('- But durations from IR to interconnection agreement (IA) have been mostly steady at 2-3 years in the last decade')
-st.markdown('- In PJM, Phase 1 takes typically 2-3 months; Phase 3 takes 20-25 months.')
-st.markdown('- Many markets including PJM are embarking on queue reform whuch has been encouraged and approved by FERC (2022). This includes a clustered, **“first-ready, first-serve”** approach, size-based study deposits, and increased readiness deposits that are at risk when projects withdraw later in the study process.')
-
-st.markdown('#### Map:')
-st.markdown('- roughly 18% of the records did not have a geoloc including 15% operational status listed projects.')
-
-row12_col1, row12_col2, row12_col3, row12_col4, row12_col5, row12_col6 = st.columns([1,1,1,1,1,1])
-palettes = cm.list_colormaps()
-with row12_col1:
-    palette = st.selectbox("Color palette", palettes, index=palettes.index("Blues"))
-with row12_col2:
-    n_colors = st.slider("Number of colors", min_value=2, max_value=20, value=8)
-with row12_col3:
-    show_nodata = st.checkbox("Show nodata areas", value=True)
-with row12_col4:
-    show_3d = st.checkbox("Show 3D view", value=False)
-with row12_col5:
-    if show_3d:
-        elev_scale = st.slider(
-            "Elevation scale", min_value=1, max_value=1000000, value=1, step=10
-        )
-        with row12_col6:
-            st.info("Press Ctrl and move the left mouse button.")
-    else:
-        elev_scale = 1
 
 
