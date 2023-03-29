@@ -1,13 +1,13 @@
 
 import pandas as pd
-import pydeck as pdk
 import altair as alt
 import geopandas as gpd
 import streamlit as st
-import leafmap.colormaps as cm
-from leafmap.common import hex_to_rgb
 from matplotlib import pyplot as plt
 import matplotlib.style as style
+import folium
+from streamlit_folium import st_folium
+
 
 style.use('fivethirtyeight')
 plt.rcParams['lines.linewidth'] = 1
@@ -38,6 +38,7 @@ csv_trend = link_prefix + "berkley/df_trend.csv"
 csv_duration = link_prefix + "berkley/df_trend_dur.csv"
 csv_q_hist = link_prefix + "berkley/df_iq_clean.csv"
 gj_iq_geo = link_prefix + "berkley/gdp_iq_qeo.geojson"
+sh_iso_geo = link_prefix + "berkley/Independent_System_Operators.shp"
 
 FUEL_LIST = ['Gas', 'Wind', 'Hydro', 'Solar', 'Other', 'Geothermal',
        'Other Storage', 'Nuclear', 'Wind+Battery', 'Solar+Battery',
@@ -46,6 +47,10 @@ FUEL_LIST = ['Gas', 'Wind', 'Hydro', 'Solar', 'Other', 'Geothermal',
        'Wind+Gas', 'CSP']
 REGION_LIST = ['CAISO', 'ISO-NE', 'MISO', 'PJM', 'NYISO', 'SPP', 'ERCOT',
        'Southeast (non-ISO)', 'West (non-ISO)']
+
+MAP_LAT = 39.49
+MAP_LON = -75.35
+MAP_ZOOM = 6
 
 @st.cache_data(persist=True)
 def load_q_data():
@@ -57,17 +62,34 @@ def load_q_data():
        'diff_months_wd'])
     # history
     df_hist = pd.read_csv(csv_duration)
-    # geoloc file
-    gdf = gpd.read_file(gj_iq_geo)
-    return df_trend, df_dur, df_hist, gdf
+    # geoloc hist
+    gdf_hist = gpd.read_file(gj_iq_geo)
+    # geoloc shape
+    gdf_iso = pd.read_file(sh_iso_geo)
+    return df_trend, df_dur, df_hist, gdf_hist, gdf_iso
 
 # Load data
-df_trend, df_dur, df_hist, gdp_iq_qeo = load_q_data()
+df_trend, df_dur, df_hist, gdf_hist, gdf_iso = load_q_data()
 
 def regions(df):
     region_list = list(df['region'].unique())
     default_region = region_list.index('PJM')
     return region_list, default_region
+
+@st.cache_data(persist=True)
+def filter_data(df, yr, ft, loc):
+    df = df.iloc[:,:9]
+    df = df[df['q_year'] == yr]
+    if ft:
+        df = df[df['type_clean'].isin(ft)]
+    df = df[df['region'] == loc]
+    return df
+
+def status_types(df):
+    status_list = list(df['q_status'].unique())
+    default_st = status_list.index('active')
+    status_type = st.selectbox('Status:', status_list,index=default_st,help = 'Filter report to show the status type of the project')
+    return status_type
 
 def app():
     st.title("U.S. Interconnection Data and Market Trends")
@@ -84,7 +106,6 @@ def app():
     # Load regions
     region_list, default_region = regions(df_hist)
 
-    #fuels_list, default_ft = fuel_types(df_dur)
     with row1_col1:
         # on the first run add variables to track in state
         if "all_option" not in st.session_state:
@@ -122,6 +143,7 @@ def app():
 
     with row2_col2:
         qyear_select = st.sidebar.slider("Enter queue year:",min_value=2001, max_value=2021,step=1, value = 2014, help = 'Filter report to show the year the project entered the queue.')
+    
     #############
     with st.expander("See chart trend by volume"):
 
@@ -138,6 +160,7 @@ def app():
                         color = 'q_status:N'
                     )
         st.altair_chart(bar_chart, use_container_width=True)
+    
     #############
     with st.expander("See chart trend by count"):
 
@@ -152,7 +175,8 @@ def app():
                         color = 'q_status:N'
                     )
         st.altair_chart(bar_chart, use_container_width=True)
-        #############
+    
+    #############
     with st.expander("See chart trend by status breakout"):
 
         row5_col1, row4_col2= st.columns([5,1])
@@ -272,13 +296,65 @@ def app():
         row10_col1.line_chart(chart_dur_vol.diff_months_cod)
         volume = chart_dur_vol.mw1
         row11_col1.bar_chart(volume)
+        
+    # raw queue data filter_data(df, yr, ft, loc)
+    raw_trend_data = filter_data(df_dur, qyear_select, selected_options_ft, region_select)
+    if st.checkbox("Show Raw Trend Queue Data",False,help = 'Displays the raw data based on filters.'):
+          st.subheader('Raw Queue Data')
+          st.write(raw_trend_data)
 
     st.markdown('- But durations from IR to interconnection agreement (IA) have been mostly steady at 2-3 years in the last decade')
     st.markdown('- In PJM, Phase 1 takes typically 2-3 months; Phase 3 takes 20-25 months.')
     st.markdown('- Many markets including PJM are embarking on queue reform whuch has been encouraged and approved by FERC (2022). This includes a clustered, **“first-ready, first-serve”** approach, size-based study deposits, and increased readiness deposits that are at risk when projects withdraw later in the study process.')
     st.markdown('#### Map:')
     st.markdown('- roughly 18% of the records did not have a geoloc including 15% operational status listed projects.')
+    row12_col1, row12_col2= st.columns([1,1])
+    row14_col1, row14_col2= st.columns([5,1])
+    # enter status
+    status_type = status_types(gdf_hist)
+    
+    gdf = gdf_hist[gdf_hist['q_year'] == qyear_select]
+    if selected_options_ft:
+        gdf = gdf[gdf['type_clean'].isin(selected_options_ft)]
+    gdf = gdf[gdf['q_status'] == status_type]
+    gdf_short = gdf[['NAME','geometry','diff_months_cod']]
+    gdf_agg = gdf_short.dissolve(by='NAME', aggfunc = {'diff_months_cod':'mean'},as_index=False) #{'diff_months':['min','max','mean','median']}
+
+    map = folium.Map(location=[MAP_LAT,MAP_LON], zoom_start=MAP_ZOOM)
+
+    folium.GeoJson(data=gdf_iso["geometry"],name=('ISO: PJM')).add_to(map)
+
+    cp = folium.Choropleth(
+        geo_data=gdf.geometry,
+        name="Duration",
+        data=gdf_agg,
+        columns=["NAME","diff_months"],
+        key_on="feature.id",
+        fill=True,
+        fill_color="YlGn",
+        fill_opacity=0.6,
+        line_opacity=0.8,
+        highlight=True,
+        edgecolor='k',
+        bins=[3, 9, 18, 36, 72,100,200],
+        legend_name="Duration in months"
+    )
+    cp.add_to(map)
+
+    feature = folium.features.GeoJson(gdf_agg,
+      name='NAME',
+      tooltip=folium.GeoJsonTooltip(fields= ["NAME","diff_months"],aliases=["Name: ","Duration: "],labels=True, localize=True))
+    cp.add_child(feature)
+    # cp.add_child(
+    #     folium.features.GeoJsonTooltip(["GEOID", "duration"], labels=True)
+    # )
+
+    folium.LayerControl().add_to(map)
+
+    row14_col1.st_map = st_folium(map, width=700, height=450)
+
 app()
+
 
 
 
