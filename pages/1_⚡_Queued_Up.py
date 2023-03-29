@@ -38,7 +38,7 @@ csv_trend = link_prefix + "berkley/df_trend.csv"
 csv_duration = link_prefix + "berkley/df_trend_dur.csv"
 csv_q_hist = link_prefix + "berkley/df_iq_clean.csv"
 gj_iq_geo = link_prefix + "berkley/gdp_iq_qeo.geojson"
-sh_iso_geo = link_prefix + "berkley/Independent_System_Operators.shp"
+sh_iso_geo = link_prefix + "berkley/geojson_iso.json"
 
 FUEL_LIST = ['Gas', 'Wind', 'Hydro', 'Solar', 'Other', 'Geothermal',
        'Other Storage', 'Nuclear', 'Wind+Battery', 'Solar+Battery',
@@ -65,7 +65,7 @@ def load_q_data():
     # geoloc hist
     gdf_hist = gpd.read_file(gj_iq_geo)
     # geoloc shape
-    gdf_iso = pd.read_file(sh_iso_geo)
+    gdf_iso = gpd.read_file(sh_iso_geo)
     return df_trend, df_dur, df_hist, gdf_hist, gdf_iso
 
 # Load data
@@ -328,7 +328,7 @@ def app():
         geo_data=gdf.geometry,
         name="Duration",
         data=gdf_agg,
-        columns=["NAME","diff_months"],
+        columns=["NAME","diff_months_cod"],
         key_on="feature.id",
         fill=True,
         fill_color="YlGn",
@@ -343,7 +343,7 @@ def app():
 
     feature = folium.features.GeoJson(gdf_agg,
       name='NAME',
-      tooltip=folium.GeoJsonTooltip(fields= ["NAME","diff_months"],aliases=["Name: ","Duration: "],labels=True, localize=True))
+      tooltip=folium.GeoJsonTooltip(fields= ["NAME","diff_months_cod"],aliases=["Name: ","Duration: "],labels=True, localize=True))
     cp.add_child(feature)
     # cp.add_child(
     #     folium.features.GeoJsonTooltip(["GEOID", "duration"], labels=True)
