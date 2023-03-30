@@ -71,6 +71,7 @@ def load_q_data():
 # Load data
 df_trend, df_dur, df_hist, gdf_hist, gdf_iso = load_q_data()
 
+@st.cache_data(persist=True)
 def regions(df):
     region_list = list(df['region'].unique())
     default_region = region_list.index('PJM')
@@ -91,6 +92,44 @@ def status_types(df):
     status_type = st.selectbox('Status:', status_list,index=default_st,help = 'Filter report to show the status type of the project')
     return status_type
 
+def filter_year(df):
+    year_list = df['q_year'].sort_values(ascending=False,na_position='last')
+    year_list = year_list.unique()
+    year_list = list(year_list)
+    default_yr = year_list.index(2020)
+    select_yr = st.selectbox('Year entered queue:', year_list,index=default_yr,help = 'Filter report to show the year in which the project entered the queue.')
+    return select_yr
+
+def filter_ft():
+    # on the first run add variables to track in state
+    if "all_option" not in st.session_state:
+        st.session_state.all_option = True
+        st.session_state.selected_options = FUEL_LIST
+
+    def check_change():
+    # this runs BEFORE the rest of the script when a change is detected
+    # from your checkbox to set selectbox
+        if st.session_state.all_option:
+            st.session_state.selected_options = FUEL_LIST
+        else:
+            st.session_state.selected_options = []
+        return
+
+    def multi_change():
+    # this runs BEFORE the rest of the script when a change is detected
+    # from your selectbox to set checkbox
+        if len(st.session_state.selected_options) == 3:
+            st.session_state.all_option = True
+        else:
+            st.session_state.all_option = False
+        return
+
+    selected_options_ft = st.sidebar.multiselect("Select one or more options:",
+            FUEL_LIST,key="selected_options", on_change=multi_change)
+
+    all_ft = st.sidebar.checkbox("Select all", key='all_option',on_change= check_change)
+    return selected_options_ft, all_ft
+
 def app():
     st.title("U.S. Interconnection Data and Market Trends")
     st.markdown(
@@ -101,49 +140,51 @@ def app():
           [geopandas](https://geopandas.org), [leafmap](https://leafmap.org), and [pydeck](https://deckgl.readthedocs.io).
     """
     )
-
+    #############
+    ############# Toggles
     row1_col1, row1_col2 = st.columns([3.0, 3.4])
     # Load regions
     region_list, default_region = regions(df_hist)
 
     with row1_col1:
-        # on the first run add variables to track in state
-        if "all_option" not in st.session_state:
-            st.session_state.all_option = True
-            st.session_state.selected_options = FUEL_LIST
+        selected_options_ft = filter_ft()
+        # # on the first run add variables to track in state
+        # if "all_option" not in st.session_state:
+        #     st.session_state.all_option = True
+        #     st.session_state.selected_options = FUEL_LIST
 
-        def check_change():
-        # this runs BEFORE the rest of the script when a change is detected
-        # from your checkbox to set selectbox
-            if st.session_state.all_option:
-                st.session_state.selected_options = FUEL_LIST
-            else:
-                st.session_state.selected_options = []
-            return
+        # def check_change():
+        # # this runs BEFORE the rest of the script when a change is detected
+        # # from your checkbox to set selectbox
+        #     if st.session_state.all_option:
+        #         st.session_state.selected_options = FUEL_LIST
+        #     else:
+        #         st.session_state.selected_options = []
+        #     return
 
-        def multi_change():
-        # this runs BEFORE the rest of the script when a change is detected
-        # from your selectbox to set checkbox
-            if len(st.session_state.selected_options) == 3:
-                st.session_state.all_option = True
-            else:
-                st.session_state.all_option = False
-            return
+        # def multi_change():
+        # # this runs BEFORE the rest of the script when a change is detected
+        # # from your selectbox to set checkbox
+        #     if len(st.session_state.selected_options) == 3:
+        #         st.session_state.all_option = True
+        #     else:
+        #         st.session_state.all_option = False
+        #     return
 
-        selected_options_ft = st.sidebar.multiselect("Select one or more options:",
-                FUEL_LIST,key="selected_options", on_change=multi_change)
+        # selected_options_ft = st.sidebar.multiselect("Select one or more options:",
+        #         FUEL_LIST,key="selected_options", on_change=multi_change)
 
-        all_ft = st.sidebar.checkbox("Select all", key='all_option',on_change= check_change)
-
-    #############
+        # all_ft = st.sidebar.checkbox("Select all", key='all_option',on_change= check_change)
+        
     row2_col1, row2_col2, row1_col3 = st.columns([3.0, 3.0, 3.4])
 
     with row2_col1:
         region_select = st.sidebar.selectbox('Region:', region_list,index=default_region,help = 'Filter report to show the market region.')
 
     with row2_col2:
-        qyear_select = st.sidebar.slider("Enter queue year:",min_value=2001, max_value=2021,step=1, value = 2014, help = 'Filter report to show the year the project entered the queue.')
-    
+        qyear_select = st.sidebar.slider("Enter queue year range for trends:",min_value=2001, max_value=2021,step=1, value = 2014, help = 'Filter report to show the year the project entered the queue.')
+
+    #############
     #############
     with st.expander("See chart trend by volume"):
 
@@ -160,7 +201,7 @@ def app():
                         color = 'q_status:N'
                     )
         st.altair_chart(bar_chart, use_container_width=True)
-    
+
     #############
     with st.expander("See chart trend by count"):
 
@@ -175,7 +216,7 @@ def app():
                         color = 'q_status:N'
                     )
         st.altair_chart(bar_chart, use_container_width=True)
-    
+
     #############
     with st.expander("See chart trend by status breakout"):
 
@@ -208,6 +249,7 @@ def app():
     st.markdown('- Historical completion rates 2000-2015: PJM (29%), MISO (27%), ISONE (22%), CAISO (13%) and NYISO (18%). (page 30)')
     st.info('- This is misleading when viewed by volume: PJM (18%), MISO (19%), ISONE (23%), CAISO (10%) 📈')
 
+    #############
     with st.expander("See tabular completion by region"):
         st.code('''# p30 Completion (COD) Percentage of Queued Projects for IRs from 2000-2015
             df_trend = df_trend[['q_year', 'q_status', 'mw1','region']]
@@ -230,74 +272,86 @@ def app():
     st.markdown('- Only 27% of all projects requesting interconnection from 2000 to 2016 achieved commercial operation by year-end 2021. (page 2 PJM Costs)')
     st.info('- While unable to tie out the number exactly it misses the trend and wide variation between markets 📈')
 
-    df_tr1 = df_trend[['q_year', 'cod_year','q_status', 'mw1','region']]
+    df_tr1 = df_trend[['q_year', 'cod_year','q_status','mw1','region']]
     def_cod = df_tr1[(df_tr1['q_year']>=2000)&(df_tr1['q_year']<=2016)&(df_tr1['cod_year']<=2021)&(df_tr1['cod_year']>=2000)]
 
     def_cod_count_yr = def_cod.groupby(['cod_year','q_status']).agg({'q_status':'count'}) # 27%
     def_cod_count_tot_yr = def_cod.groupby(['cod_year']).agg({'q_status':'count'})
     def_perc_cod_count_yr = def_cod_count_yr.div(def_cod_count_tot_yr,level=0) * 100
 
+    # How the 27% claim evolved overall
     def_perc_cod_trend = def_perc_cod_count_yr[def_perc_cod_count_yr.index.isin(['operational'], level=1)]
 
-    def_reg_count = def_cod.groupby(['cod_year','region','q_status']).agg({'mw1':'count'})
-    def_reg_count = def_reg_count.reset_index()
-    def_reg_count = def_reg_count.set_index(['cod_year','region'])
-    def_cod_count_tot = def_cod.groupby(['cod_year','region']).agg({'mw1':'count'})
+    # How the 27% claim evolved by region / needed to subset by mw1 b/c status in the index
+    def_reg_count_yr = def_cod.groupby(['cod_year','region','q_status']).agg({'mw1':'count'})
+    def_reg_count_yr = def_reg_count_yr[def_reg_count_yr.index.get_level_values(2).isin(['operational'])]
+    def_reg_count_tot_yr = def_cod.groupby(['cod_year','q_status']).agg({'mw1':'count'})
+    def_reg_count_tot_yr = def_reg_count_tot_yr[def_reg_count_tot_yr.index.get_level_values(1).isin(['operational'])]
+    def_reg_count_yr = def_reg_count_yr.reset_index()
+    def_reg_count_yr = def_reg_count_yr.set_index(['cod_year','q_status'])
+    df_reg_perc_cod_tot = def_reg_count_yr.join(def_reg_count_tot_yr,lsuffix='_r', rsuffix='_t')
+    df_reg_perc_cod_tot['perc'] = df_reg_perc_cod_tot.mw1_r/df_reg_perc_cod_tot.mw1_t
 
-    df_cod = def_reg_count.join(def_cod_count_tot,lsuffix='_s', rsuffix='_t')
-    df_cod['perc'] = df_cod.mw1_s/df_cod.mw1_t
-
+    #############
     with st.expander("See tabular operational trend"):
+        row7_col1, row7_col2= st.columns([1,1])
         st.code("""
             def_cod = df_trend[(df_tr1['q_year']>=2000)&(df_tr1['q_year']<=2016)&(df_tr1['cod_year']<=2021)]
             def_cod_count = def_cod.groupby(['q_status']).agg({'mw1':'count'}) # 24%
             def_cod_count_tot = def_cod.agg({'mw1':'count'})
             def_perc_cod_count = def_cod_count.div(def_cod_count_tot,level='mw1') * 100
         """, language="python")
-        row7_col1, row7_col2= st.columns([1,1])
-        row7_col1.caption("Trend overall operational count")
+        row7_col1.caption("Trend operational count")
         row7_col1.dataframe(def_perc_cod_trend)
-        row7_col2.caption("Trend overall regional operational count")
-        row7_col2.dataframe(df_cod)
+        row7_col2.caption("Trend regional operational volume")
+        row7_col2.dataframe(df_reg_perc_cod_tot)
 
     #############
     with st.expander("See chart operational trend"):
         row8_col1, row8_col2= st.columns([5,1])
         chart_cod = def_perc_cod_trend.reset_index('q_status',drop=True)
-        row8_col1.line_chart(chart_cod, use_container_width=True)
+        chart_cod.reset_index(inplace=True)
+        overall_op_chart = alt.Chart(chart_cod).mark_line().encode(
+                  x=alt.X('cod_year:O', title="COD Year"),
+                  y=alt.Y('q_status:Q', title = "Percent")
+                ).properties(title="Overall operational trend")
+        row8_col1.altair_chart(overall_op_chart, use_container_width=True)
 
-        row9_col1, row8_col2= st.columns([5,1])
-        chart_region_cod = df_cod[df_cod['q_status']=='operational']
+        row9_col1, row9_col2= st.columns([24,1])
+        chart_region_cod = df_reg_perc_cod_tot
+        # chart_region_cod = df_cod[df_cod['q_year']>=qyear_select]
+        # chart_region_cod = df_cod[df_cod['type_clean'].isin(selected_options_ft)]
         chart_region_cod = chart_region_cod.reset_index()
-        chart_region_cod.drop(labels=['q_status','mw1_s','mw1_t'],axis=1,inplace=True)
+        chart_region_cod.drop(labels=['q_status','mw1_r','mw1_t'],axis=1,inplace=True)
         chart = alt.Chart(chart_region_cod).mark_line().encode(
-                  x=alt.X('cod_year:O'),
-                  y=alt.Y('perc:Q'),
-                  color=alt.Color('region:N')
-                ).properties(title="The queues are growing as evidenced by the perc operational status")
+                  x=alt.X('cod_year:O', title="COD Year"),
+                  y=alt.Y('perc:Q', title = "Percent"),
+                  color=alt.Color('region:N',legend=alt.Legend(title='Market'))
+                ).properties(title="Regional operational trend")
         row9_col1.altair_chart(chart, use_container_width=True)
 
     st.subheader('Duration:')
-    st.markdown('- The duration from interconnection request (IR) to COD is increasing, averaging ~4 years since 2016.')
+    st.markdown('- The duration from Interconnection Request (IR) to COD is increasing, averaging ~4 years since 2016.')
 
     chart_dur = df_dur[['q_year','mw1','diff_months_cod']]
     chart_dur = chart_dur[chart_dur['q_year']>2008]
     chart_dur_vol = chart_dur.groupby('q_year').agg({'diff_months_cod':'mean','mw1':'sum'})
 
         #############
-    with st.expander("See chart operational trend"):
-        row10_col1, row10_col2= st.columns([5,1])
-        row11_col1, row11_col2= st.columns([5,1])
-        st.header("Selection bias: successful projects have not seen their duration significantly increase")
-        st.subheader("Berkley Labs 2021")
+    with st.expander("See chart IR to COD"):
+
         latest_day_data = chart_dur_vol.diff_months_cod.iloc[-1]
-        st.text(f"2021 mean duration: {latest_day_data:.2f}")
-        st.subheader("Historical Data")
+        st.subheader(f"2021 mean duration: {latest_day_data:.2f}")
+        row10_col1, row10_col2= st.columns([5,1])
         row10_col1.line_chart(chart_dur_vol.diff_months_cod)
         volume = chart_dur_vol.mw1
+
+        st.subheader("Selection bias: successful projects have not seen their duration significantly increase")
+        row11_col1, row11_col2= st.columns([5,1])
         row11_col1.bar_chart(volume)
-        
+
     # raw queue data filter_data(df, yr, ft, loc)
+    st.subheader("Historical Data")
     raw_trend_data = filter_data(df_dur, qyear_select, selected_options_ft, region_select)
     if st.checkbox("Show Raw Trend Queue Data",False,help = 'Displays the raw data based on filters.'):
           st.subheader('Raw Queue Data')
@@ -306,14 +360,17 @@ def app():
     st.markdown('- But durations from IR to interconnection agreement (IA) have been mostly steady at 2-3 years in the last decade')
     st.markdown('- In PJM, Phase 1 takes typically 2-3 months; Phase 3 takes 20-25 months.')
     st.markdown('- Many markets including PJM are embarking on queue reform whuch has been encouraged and approved by FERC (2022). This includes a clustered, **“first-ready, first-serve”** approach, size-based study deposits, and increased readiness deposits that are at risk when projects withdraw later in the study process.')
+
+    ################################
     st.markdown('#### Map:')
     st.markdown('- roughly 18% of the records did not have a geoloc including 15% operational status listed projects.')
     row12_col1, row12_col2= st.columns([1,1])
     row14_col1, row14_col2= st.columns([5,1])
     # enter status
     status_type = status_types(gdf_hist)
-    
-    gdf = gdf_hist[gdf_hist['q_year'] == qyear_select]
+    select_year = filter_year(gdf_hist)
+
+    gdf = gdf_hist[gdf_hist['q_year'] == select_year]
     if selected_options_ft:
         gdf = gdf[gdf['type_clean'].isin(selected_options_ft)]
     gdf = gdf[gdf['q_status'] == status_type]
@@ -322,11 +379,11 @@ def app():
 
     map = folium.Map(location=[MAP_LAT,MAP_LON], zoom_start=MAP_ZOOM)
 
-    folium.GeoJson(data=gdf_iso["geometry"],name=('ISO: PJM')).add_to(map)
+    folium.GeoJson(data=gdf_iso["geometry"],name=('Market areas')).add_to(map)
 
     cp = folium.Choropleth(
         geo_data=gdf.geometry,
-        name="Duration",
+        name="IQ to COD duration",
         data=gdf_agg,
         columns=["NAME","diff_months_cod"],
         key_on="feature.id",
@@ -343,7 +400,7 @@ def app():
 
     feature = folium.features.GeoJson(gdf_agg,
       name='NAME',
-      tooltip=folium.GeoJsonTooltip(fields= ["NAME","diff_months_cod"],aliases=["Name: ","Duration: "],labels=True, localize=True))
+      tooltip=folium.GeoJsonTooltip(fields= ["NAME","diff_months_cod"],aliases=["County name: ","COD duration: "],labels=True, localize=True))
     cp.add_child(feature)
     # cp.add_child(
     #     folium.features.GeoJsonTooltip(["GEOID", "duration"], labels=True)
@@ -354,7 +411,5 @@ def app():
     row14_col1.st_map = st_folium(map, width=700, height=450)
 
 app()
-
-
 
 
