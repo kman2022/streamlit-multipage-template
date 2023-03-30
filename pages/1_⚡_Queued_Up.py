@@ -1,13 +1,9 @@
 
 import pandas as pd
 import altair as alt
-import geopandas as gpd
 import streamlit as st
 from matplotlib import pyplot as plt
 import matplotlib.style as style
-import folium
-from streamlit_folium import st_folium
-
 
 style.use('fivethirtyeight')
 plt.rcParams['lines.linewidth'] = 1
@@ -37,20 +33,14 @@ link_prefix = "https://raw.githubusercontent.com/kman2022/data/main/main/"
 csv_trend = link_prefix + "berkley/df_trend.csv"
 csv_duration = link_prefix + "berkley/df_trend_dur.csv"
 csv_q_hist = link_prefix + "berkley/df_iq_clean.csv"
-gj_iq_geo = link_prefix + "berkley/gdp_iq_qeo.geojson"
-sh_iso_geo = link_prefix + "berkley/geojson_iso.json"
 
 FUEL_LIST = ['Gas', 'Wind', 'Hydro', 'Solar', 'Other', 'Geothermal',
-       'Other Storage', 'Nuclear', 'Wind+Battery', 'Solar+Battery',
-       'Gas+Battery', 'Solar+Wind', 'Gas+Solar', 'Solar+Gas', 'Battery',
-       'Battery+Gas', 'Coal', 'Offshore Wind', 'Wind+Storage',
-       'Wind+Gas', 'CSP']
+        'Other Storage', 'Nuclear', 'Wind+Battery', 'Solar+Battery',
+        'Gas+Battery', 'Solar+Wind', 'Gas+Solar', 'Solar+Gas', 'Battery',
+        'Battery+Gas', 'Coal', 'Offshore Wind', 'Wind+Storage',
+        'Wind+Gas', 'CSP']
 REGION_LIST = ['CAISO', 'ISO-NE', 'MISO', 'PJM', 'NYISO', 'SPP', 'ERCOT',
        'Southeast (non-ISO)', 'West (non-ISO)']
-
-MAP_LAT = 39.49
-MAP_LON = -75.35
-MAP_ZOOM = 6
 
 @st.cache_data(persist=True)
 def load_q_data():
@@ -62,18 +52,17 @@ def load_q_data():
        'diff_months_wd'])
     # history
     df_hist = pd.read_csv(csv_duration)
-    # geoloc hist
-    gdf_hist = gpd.read_file(gj_iq_geo)
-    # geoloc shape
-    gdf_iso = gpd.read_file(sh_iso_geo)
-    return df_trend, df_dur, df_hist, gdf_hist, gdf_iso
+    return df_trend, df_dur, df_hist
 
 # Load data
-df_trend, df_dur, df_hist, gdf_hist, gdf_iso = load_q_data()
+df_trend, df_dur, df_hist = load_q_data()
+
+def unique_no_nan(x):
+    return x.dropna().unique()
 
 @st.cache_data(persist=True)
 def regions(df):
-    region_list = list(df['region'].unique())
+    region_list = list(unique_no_nan(df['region']))
     default_region = region_list.index('PJM')
     return region_list, default_region
 
@@ -87,48 +76,17 @@ def filter_data(df, yr, ft, loc):
     return df
 
 def status_types(df):
-    status_list = list(df['q_status'].unique())
+    status_list = list(unique_no_nan(df['q_status']))
     default_st = status_list.index('active')
     status_type = st.selectbox('Status:', status_list,index=default_st,help = 'Filter report to show the status type of the project')
     return status_type
 
 def filter_year(df):
     year_list = df['q_year'].sort_values(ascending=False,na_position='last')
-    year_list = year_list.unique()
-    year_list = list(year_list)
+    year_list = list(unique_no_nan(year_list))
     default_yr = year_list.index(2020)
     select_yr = st.selectbox('Year entered queue:', year_list,index=default_yr,help = 'Filter report to show the year in which the project entered the queue.')
     return select_yr
-
-def filter_ft():
-    # on the first run add variables to track in state
-    if "all_option" not in st.session_state:
-        st.session_state.all_option = True
-        st.session_state.selected_options = FUEL_LIST
-
-    def check_change():
-    # this runs BEFORE the rest of the script when a change is detected
-    # from your checkbox to set selectbox
-        if st.session_state.all_option:
-            st.session_state.selected_options = FUEL_LIST
-        else:
-            st.session_state.selected_options = []
-        return
-
-    def multi_change():
-    # this runs BEFORE the rest of the script when a change is detected
-    # from your selectbox to set checkbox
-        if len(st.session_state.selected_options) == 3:
-            st.session_state.all_option = True
-        else:
-            st.session_state.all_option = False
-        return
-
-    selected_options_ft = st.sidebar.multiselect("Select one or more options:",
-            FUEL_LIST,key="selected_options", on_change=multi_change)
-
-    all_ft = st.sidebar.checkbox("Select all", key='all_option',on_change= check_change)
-    return selected_options_ft, all_ft
 
 def app():
     st.title("U.S. Interconnection Data and Market Trends")
@@ -147,34 +105,33 @@ def app():
     region_list, default_region = regions(df_hist)
 
     with row1_col1:
-        selected_options_ft = filter_ft()
-        # # on the first run add variables to track in state
-        # if "all_option" not in st.session_state:
-        #     st.session_state.all_option = True
-        #     st.session_state.selected_options = FUEL_LIST
+        # on the first run add variables to track in state
+        if "all_option" not in st.session_state:
+            st.session_state.all_option = True
+            st.session_state.selected_options = FUEL_LIST
 
-        # def check_change():
-        # # this runs BEFORE the rest of the script when a change is detected
-        # # from your checkbox to set selectbox
-        #     if st.session_state.all_option:
-        #         st.session_state.selected_options = FUEL_LIST
-        #     else:
-        #         st.session_state.selected_options = []
-        #     return
+        def check_change():
+        # this runs BEFORE the rest of the script when a change is detected
+        # from your checkbox to set selectbox
+            if st.session_state.all_option:
+                st.session_state.selected_options = FUEL_LIST
+            else:
+                st.session_state.selected_options = []
+            return
 
-        # def multi_change():
-        # # this runs BEFORE the rest of the script when a change is detected
-        # # from your selectbox to set checkbox
-        #     if len(st.session_state.selected_options) == 3:
-        #         st.session_state.all_option = True
-        #     else:
-        #         st.session_state.all_option = False
-        #     return
+        def multi_change():
+        # this runs BEFORE the rest of the script when a change is detected
+        # from your selectbox to set checkbox
+            if len(st.session_state.selected_options) == 3:
+                st.session_state.all_option = True
+            else:
+                st.session_state.all_option = False
+            return
 
-        # selected_options_ft = st.sidebar.multiselect("Select one or more options:",
-        #         FUEL_LIST,key="selected_options", on_change=multi_change)
+        selected_options_ft = st.sidebar.multiselect("Select one or more options:",
+                FUEL_LIST,key="selected_options", on_change=multi_change)
 
-        # all_ft = st.sidebar.checkbox("Select all", key='all_option',on_change= check_change)
+        all_ft = st.sidebar.checkbox("Select all", key='all_option',on_change= check_change)
         
     row2_col1, row2_col2, row1_col3 = st.columns([3.0, 3.0, 3.4])
 
@@ -360,55 +317,6 @@ def app():
     st.markdown('- But durations from IR to interconnection agreement (IA) have been mostly steady at 2-3 years in the last decade')
     st.markdown('- In PJM, Phase 1 takes typically 2-3 months; Phase 3 takes 20-25 months.')
     st.markdown('- Many markets including PJM are embarking on queue reform whuch has been encouraged and approved by FERC (2022). This includes a clustered, **“first-ready, first-serve”** approach, size-based study deposits, and increased readiness deposits that are at risk when projects withdraw later in the study process.')
-
-    ################################
-    st.markdown('#### Map:')
-    st.markdown('- roughly 18% of the records did not have a geoloc including 15% operational status listed projects.')
-    row12_col1, row12_col2= st.columns([1,1])
-    row14_col1, row14_col2= st.columns([5,1])
-    # enter status
-    status_type = status_types(gdf_hist)
-    select_year = filter_year(gdf_hist)
-
-    gdf = gdf_hist[gdf_hist['q_year'] == select_year]
-    if selected_options_ft:
-        gdf = gdf[gdf['type_clean'].isin(selected_options_ft)]
-    gdf = gdf[gdf['q_status'] == status_type]
-    gdf_short = gdf[['NAME','geometry','diff_months_cod']]
-    gdf_agg = gdf_short.dissolve(by='NAME', aggfunc = {'diff_months_cod':'mean'},as_index=False) #{'diff_months':['min','max','mean','median']}
-
-    map = folium.Map(location=[MAP_LAT,MAP_LON], zoom_start=MAP_ZOOM)
-
-    folium.GeoJson(data=gdf_iso["geometry"],name=('Market areas')).add_to(map)
-
-    cp = folium.Choropleth(
-        geo_data=gdf.geometry,
-        name="IQ to COD duration",
-        data=gdf_agg,
-        columns=["NAME","diff_months_cod"],
-        key_on="feature.id",
-        fill=True,
-        fill_color="YlGn",
-        fill_opacity=0.6,
-        line_opacity=0.8,
-        highlight=True,
-        edgecolor='k',
-        bins=[3, 9, 18, 36, 72,100,200],
-        legend_name="Duration in months"
-    )
-    cp.add_to(map)
-
-    feature = folium.features.GeoJson(gdf_agg,
-      name='NAME',
-      tooltip=folium.GeoJsonTooltip(fields= ["NAME","diff_months_cod"],aliases=["County name: ","COD duration: "],labels=True, localize=True))
-    cp.add_child(feature)
-    # cp.add_child(
-    #     folium.features.GeoJsonTooltip(["GEOID", "duration"], labels=True)
-    # )
-
-    folium.LayerControl().add_to(map)
-
-    row14_col1.st_map = st_folium(map, width=700, height=450)
 
 app()
 
