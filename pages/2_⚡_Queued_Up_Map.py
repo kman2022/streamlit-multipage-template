@@ -9,7 +9,7 @@ from folium.plugins import Draw
 
 
 st.set_page_config(page_title="Queued Up Map ⚡",
-                   page_icon='📈',
+                   page_icon='https://i.imgur.com/UbOXYAU.png',
                    layout="wide")
 
 st.title("Queued Up Map ⚡ ")

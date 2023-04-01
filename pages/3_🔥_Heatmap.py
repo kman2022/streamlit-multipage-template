@@ -4,19 +4,22 @@ import leafmap.foliumap as leafmap
 
 
 st.set_page_config(page_title="PJM Costs ⚡",
-                   page_icon='🔥',
+                   page_icon='https://i.imgur.com/UbOXYAU.png',
                    layout="wide")
 
+PROCESS_IMAGE ='https://github.com/kman2022/data/blob/main/main/berkley/IQ_study_process_small%20copy.png?raw=true'
+TRANSMISSION_IMAGE = 'https://github.com/kman2022/data/blob/main/main/berkley/transmission.png?raw=true'
+pjm_im = 'https://www.pjm.com/assets/responsive/img/pjm-logo.png'
 
 mkdwn_analysis = """
     **Source:** [Generator Interconnection Costs to the Transmission System:](https://emp.lbl.gov/interconnection_costs): Data for PJM Territory through 2022. Joachim Seel, Joseph Rand, Will Gorman, Dev Millstein, Ryan Wiser. January 2023.
 """
 
-pjm_im = 'https://www.pjm.com/assets/responsive/img/pjm-logo.png'
 st.sidebar.image(pjm_im,width=200)
-st.sidebar.info(mkdwn_analysis)
-logo = "https://i.imgur.com/UbOXYAU.png"
-st.sidebar.image(logo)
+st.sidebar.image(TRANSMISSION_IMAGE,width=200)
+st.sidebar.image(PROCESS_IMAGE,width=300)
+
+
 
 st.title("PJM Generator Interconnection Costs")
 
@@ -51,7 +54,7 @@ m.to_streamlit(height=700)
 
 with st.expander("See technical notes"):
     st.subheader('Definitions:')
-    st.markdown('- Project status: "active", "withdrawn", and "completed" projects.')
+    st.markdown('- Project status: **"active"**, **"withdrawn"**, and **"completed"** projects.')
     st.markdown('- Study Type: interconnection study (Feasibility Study, System Integration Study, Addendum).')
     st.markdown('- 2022 POI Cost/kW: interconnection costs of point of interconnection components in real usd 2022/kW using a gdp deflator.')
     st.markdown('- 2022 Network Cost/kW: interconnection costs of network upgrade components in real usd 2022/kW using a gdp deflator.')
