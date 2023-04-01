@@ -7,6 +7,7 @@ import folium
 from streamlit_folium import st_folium
 from folium.plugins import Draw
 
+
 st.set_page_config(page_title="Queued Up Map ⚡",
                    page_icon='📈',
                    layout="wide")
@@ -18,6 +19,8 @@ mkdwn_analysis = """
 """
 
 st.sidebar.info(mkdwn_analysis)
+logo = "https://i.imgur.com/UbOXYAU.png"
+st.sidebar.image(logo)
 
 # to do
 # need to remap projects as CA is not avail
@@ -30,7 +33,7 @@ st.sidebar.info(mkdwn_analysis)
 link_prefix = "https://raw.githubusercontent.com/kman2022/data/main/main/"
 csv_q_hist = link_prefix + "berkley/df_iq_clean.csv"
 gj_iq_geo = link_prefix + "berkley/gdp_iq_qeo.geojson"
-sh_iso_geo = link_prefix + "berkley/geojson_iso.json"
+sh_iso_geo = link_prefix + "berkley/geojson_iso.json" # 19,689/24,381
 
 REGION_LIST = ['CAISO', 'ISO-NE', 'MISO', 'PJM', 'NYISO', 'SPP', 'ERCOT',
        'Southeast (non-ISO)', 'West (non-ISO)']
@@ -99,7 +102,7 @@ def main():
 
     ################################
     st.markdown('#### Map:')
-    st.markdown('- Roughly 18% of the records did not have a geoloc including 15% operational status listed projects.')
+    st.markdown('- Roughly 15% of the records did not have a geolocations.')
 
     ############# Toggles
     row1_col1, row1_col2, row1_col3 = st.columns([3.0, 3.0, 3.4])
@@ -141,45 +144,50 @@ def main():
         gdf = gdf[gdf['region']==select_region]
         gdf_iso_sel = gdf_iso[gdf_iso['region']==select_region]
         gdf = gdf[gdf['q_status'] == status_type]
-        gdf_short = gdf[['NAME','diff_months_cod','geometry']]
+        gdf_short = gdf[['NAME','diff_months_cod','mw1','geometry']]
 
-        gdf_agg = gdf_short.dissolve(by='NAME', aggfunc = {'diff_months_cod':'mean'},as_index=False) #{'diff_months':['min','max','mean','median']}
-        gdf_geo = gdf_agg[gdf_agg['diff_months_cod']>0]
-        gdf_geo = gdf_geo[['NAME','diff_months_cod','geometry']]
-
+        gdf_agg = gdf_short.dissolve(by='NAME', aggfunc = {'diff_months_cod':'mean','mw1':'sum'},as_index=False) 
+        gdf_geo = gdf_agg[['NAME','diff_months_cod','mw1','geometry']]
+        
         map_lat = gdf_iso_sel.centroid.y
         map_lon = gdf_iso_sel.centroid.x
-        max_dur = gdf_geo['diff_months_cod'].max()
-        mean_75 = gdf_geo['diff_months_cod'].quantile(0.75)
-        mean_dur = gdf_geo['diff_months_cod'].mean()
-        mean_25 = gdf_geo['diff_months_cod'].quantile(0.25)
-        min_dur = gdf_geo['diff_months_cod'].min()
 
-        map = folium.Map(location=[map_lat,map_lon], zoom_start=MAP_ZOOM, control_scale=True)
+        map = folium.Map(location=[map_lat,map_lon], 
+                         zoom_start=MAP_ZOOM, 
+                         control_scale=True,
+                         tiles='CartoDB Positron',
+                         attr='<a href="TBD">TBD</a>')
+        
         Draw(export=True).add_to(map)
         folium.GeoJson(data=gdf_iso_sel,name=('Market areas'),
-                        tooltip=folium.GeoJsonTooltip(fields=['region','PEAK_LOAD','AVG_LOAD','YEAR']),
-                        style_function= lambda feature: {'fillOpacity':0.3, 'weight':.2}).add_to(map)
-
+                        tooltip=folium.GeoJsonTooltip(fields=['region','PEAK_LOAD','AVG_LOAD','YEAR'],labels=True),
+                        style_function= lambda feature: {'fillOpacity':0.3, 'weight':0.2}
+                        ).add_to(map)
+        
         cp = folium.Choropleth(
             geo_data=gdf_geo,
             name="Counties",
             data=gdf_geo,
-            columns=["NAME","diff_months_cod"],
-            key_on="feature.id",
+            columns=["NAME","diff_months_cod","mw1"],
+            key_on="properties.NAME",
             fill=True,
             fill_color="YlOrRd",
             fill_opacity=0.6,
             line_opacity=0.5,
             highlight=True,
             edgecolor='k',
-            bins=[min_dur,mean_25,mean_dur,mean_75,max_dur],
+            bins=list(gdf_geo['diff_months_cod'].quantile([0,0.25,.5,.75,1])),
             legend_name="Duration in months"
         )
         cp.add_to(map)
-        feature = folium.features.GeoJson(gdf_agg,
+        feature = folium.features.GeoJson(gdf_geo,
           name='NAME',
-          tooltip=folium.GeoJsonTooltip(fields= ["NAME","diff_months_cod"],aliases=["County name: ","COD duration: "],labels=True, localize=True))
+          tooltip=folium.GeoJsonTooltip(fields= ["NAME","diff_months_cod","mw1"],
+                                        aliases=["County: ","Avg. duration: ","Sum capacity: "],
+                                        labels=True, 
+                                        localize=True,
+                                        style=("background-color: white; color: black;font-family:arial, padding: 10px;")))
+                                        
         cp.add_child(feature)
 
         folium.LayerControl().add_to(map)
