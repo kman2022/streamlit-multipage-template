@@ -1,6 +1,5 @@
 
 import pandas as pd
-import fiona
 import geopandas as gpd
 import streamlit as st
 import leafmap.foliumap as leafmap
@@ -14,6 +13,8 @@ PROCESS_IMAGE = 'https://github.com/kman2022/data/blob/main/main/berkley/IQ_stud
 TRANSMISSION_IMAGE = 'https://github.com/kman2022/data/blob/main/main/berkley/transmission.png?raw=true'
 pjm_im = 'https://www.pjm.com/assets/responsive/img/pjm-logo.png'
 MAP_FILE = "https://github.com/kman2022/data/blob/main/main/berkley/df_pjm_cost_map_agg.csv?raw=true"
+ISO_FILE = 'https://github.com/kman2022/data/blob/main/main/berkley/pjm.geojson?raw=true'
+TRANS_FILE = 'https://github.com/kman2022/data/blob/main/main/berkley/pjm_transmission_short.geojson?raw=true'
 
 
 mkdwn_analysis = """
@@ -35,9 +36,8 @@ def load_pjm_cost_map_data():
     # geoloc hist
     df_map_cost = pd.read_csv(MAP_FILE)
     # geoloc shape
-    # gdf_iso = gpd.read_file(sh_iso_geo)
-    # gdf_iso['region'] = gdf_iso['NAME'].map(REGION_MAP)
-    return df_map_cost
+    gdf_iso = gpd.read_file(ISO_FILE)
+    return df_map_cost, gdf_iso
 
 with st.expander("See summary"):
     st.subheader(
@@ -75,7 +75,6 @@ with st.expander("See summary details"):
     st.markdown('- Not all have cost data: 818 have POI costs, 920 have network costs and 981 include total costs.')
     st.markdown('- Only 1 project has a duration under 3 months which appears to be related to the [Peach Bottom](https://www.nrc.gov/info-finder/reactors/pb3.html) relicensing in 2004 for which there are no cost data.')
 
-
 def unique_no_nan(x):
     return x.dropna().unique()
 
@@ -105,12 +104,18 @@ def filter_fuel(df):
     return select_fuel
 
 # assign data and filters
-df_map_cost = load_pjm_cost_map_data()
+df_map_cost, gdf_iso = load_pjm_cost_map_data()
 status_type = filter_cost_status(df_map_cost)
 select_yr = filter_year(df_map_cost)
 select_fuel = filter_fuel(df_map_cost)
+
+# fix filter format
 # volume how to make 3D
 # price color by price
+# need popup box
+# need chart below showing avg cost by status type
+# need chart showing cost growth
+# need trany line overlay
 
 with st.expander("See source code"):
     with st.echo():
@@ -120,7 +125,7 @@ with st.expander("See source code"):
         df = df[df['request_status'] == status_type]
         map_lat = df['lat'].mean()
         map_lon = df['lon'].mean()
-        m = leafmap.Map(center=[map_lat, map_lon], zoom=6, tiles="stamentoner")
+        m = leafmap.Map(center=[map_lat, map_lon], zoom=7, tiles="stamentoner")
         m.add_heatmap(
             df,
             latitude="lat",
@@ -129,6 +134,32 @@ with st.expander("See source code"):
             name="Heat map",
             radius=20,
         )
+        vmin = 0
+        vmax = max(df['$2022_total_cost/kw'])
+        colors = ['a7d661','f2e250','f58727','f52b25']
+        m.add_colorbar(colors=colors, vmin=vmin, vmax=vmax,caption='Costs in $/kW')
+        style = {
+                "stroke": True,
+                "color": "#0000ff",
+                "weight": 2,
+                "opacity": 1,
+                "fill": True,
+                "fillColor": "#0000ff",
+                "fillOpacity": 0.1,
+                }
+        hover_style = {"fillOpacity": 0.7}
+        m.add_geojson(ISO_FILE, layer_name="PJM area", style=style, hover_style=hover_style)
+        t_style = {
+                "stroke": True,
+                "color": "#8a8988",
+                "weight": 1,
+                "opacity": 0.5,
+                "fill": True,
+                "fillColor": "#94908b",
+                "fillOpacity": 0.1,
+                }
+        t_hover_style = {"fillOpacity": 0.5}
+        m.add_geojson(TRANS_FILE, layer_name="HV transmission", style=t_style, hover_style=t_hover_style)
 m.to_streamlit(height=700)
 
 with st.expander("See technical notes"):
