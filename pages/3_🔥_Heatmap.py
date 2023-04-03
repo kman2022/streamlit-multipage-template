@@ -1,5 +1,10 @@
+
+import pandas as pd
+import fiona
+import geopandas as gpd
 import streamlit as st
 import leafmap.foliumap as leafmap
+
 
 st.set_page_config(page_title="PJM Costs ⚡",
                    page_icon='https://i.imgur.com/UbOXYAU.png',
@@ -8,6 +13,8 @@ st.set_page_config(page_title="PJM Costs ⚡",
 PROCESS_IMAGE = 'https://github.com/kman2022/data/blob/main/main/berkley/IQ_study_process_small%20copy.png?raw=true'
 TRANSMISSION_IMAGE = 'https://github.com/kman2022/data/blob/main/main/berkley/transmission.png?raw=true'
 pjm_im = 'https://www.pjm.com/assets/responsive/img/pjm-logo.png'
+MAP_FILE = "https://github.com/kman2022/data/blob/main/main/berkley/df_pjm_cost_map_agg.csv?raw=true"
+
 
 mkdwn_analysis = """
     **Source:** [Generator Interconnection Costs to the Transmission System:](https://emp.lbl.gov/interconnection_costs): Data for PJM Territory through 2022. Joachim Seel, Joseph Rand, Will Gorman, Dev Millstein, Ryan Wiser. January 2023.
@@ -23,7 +30,14 @@ st.title("PJM Generator Interconnection Costs")
 # quantify growth
 # quantify costs / split out / split out by fuel
 # are costs and connection times higher in the border regions where must coordinate with adjoing tso?
-
+@st.cache_data(persist=True)
+def load_pjm_cost_map_data():
+    # geoloc hist
+    df_map_cost = pd.read_csv(MAP_FILE)
+    # geoloc shape
+    # gdf_iso = gpd.read_file(sh_iso_geo)
+    # gdf_iso['region'] = gdf_iso['NAME'].map(REGION_MAP)
+    return df_map_cost
 
 with st.expander("See summary"):
     st.subheader(
@@ -41,7 +55,7 @@ with st.expander("See summary"):
 
 with st.expander("See summary findings"):
     st.subheader('Findings:')
-    st.success('More than **95% of all projects have interconnection costs under usd 200/kW**, but five projects cluster around usd 400/kW and two havec osts of usd 712/kW and usd 3,728/kW. Typical project costs are $24/kW.') 
+    st.success('More than **95% of all projects have interconnection costs under usd 200/kW**, but five projects cluster around usd 400/kW and two havec osts of usd 712/kW and usd 3,728/kW. Typical project costs are $24/kW.')
     st.warning('Interconnection costs have **doubled from usd 42/kW before 2020 to usd 84/kW between 2020 and 2022**.')
     st.warning('Projects that were still actively moving through the interconnection queues saw **costs increase eightfold**, from usd 29/kW to usd 240/kW (2017-2019 vs. 2020-2022.')
     st.warning('Projects that withdraw have seen *costs more than double*,from usd 255/kW to usd 599/kW (2017-2019 vs. 2020-2022).')
@@ -61,15 +75,57 @@ with st.expander("See summary details"):
     st.markdown('- Not all have cost data: 818 have POI costs, 920 have network costs and 981 include total costs.')
     st.markdown('- Only 1 project has a duration under 3 months which appears to be related to the [Peach Bottom](https://www.nrc.gov/info-finder/reactors/pb3.html) relicensing in 2004 for which there are no cost data.')
 
+
+def unique_no_nan(x):
+    return x.dropna().unique()
+
+def filter_cost_status(df):
+    status_list = list(unique_no_nan(df['request_status']))
+    default_st = status_list.index('Complete')
+    status_type = st.selectbox('Status:',
+                               status_list,index=default_st,
+                               help = 'Filter report to show the status type of the project')
+    return status_type
+
+def filter_year(df):
+    year_list = df['q_year'].sort_values(ascending=False,na_position='last')
+    year_list = list(unique_no_nan(year_list))
+    default_yr = year_list.index(2020)
+    select_yr = st.selectbox('Year entered queue:',
+                              year_list,index=default_yr,
+                              help = 'Filter report to show the year in which the project entered the queue.')
+    return select_yr
+
+def filter_fuel(df):
+    fuel_list = list(unique_no_nan(df['fuel']))
+    default_ft = fuel_list.index('Solar')
+    select_fuel = st.selectbox('Fuel:',
+                                fuel_list,index=default_ft,
+                                help = 'Filter report to show the status type of the project')
+    return select_fuel
+
+# assign data and filters
+df_map_cost = load_pjm_cost_map_data()
+status_type = filter_cost_status(df_map_cost)
+select_yr = filter_year(df_map_cost)
+select_fuel = filter_fuel(df_map_cost)
+# volume how to make 3D
+# price color by price
+
 with st.expander("See source code"):
     with st.echo():
-        filepath = "https://raw.githubusercontent.com/giswqs/leafmap/master/examples/data/us_cities.csv"
-        m = leafmap.Map(center=[40, -100], zoom=4, tiles="stamentoner")
+        df = df_map_cost
+        df = df[df['q_year'] == select_yr]
+        df = df[df['fuel']==select_fuel]
+        df = df[df['request_status'] == status_type]
+        map_lat = df['lat'].mean()
+        map_lon = df['lon'].mean()
+        m = leafmap.Map(center=[map_lat, map_lon], zoom=6, tiles="stamentoner")
         m.add_heatmap(
-            filepath,
-            latitude="latitude",
-            longitude="longitude",
-            value="pop_max",
+            df,
+            latitude="lat",
+            longitude="lon",
+            value="$2022_total_cost/kw",
             name="Heat map",
             radius=20,
         )
@@ -91,7 +147,11 @@ with st.expander("See PJM resources"):
     st.subheader('[PJM](https://www.pjm.com/) Resources:')
     st.markdown('- [PJM Maps](https://www.pjm.com/library/maps)')
     st.markdown('- [PJM Planning](https://www.pjm.com/planning)')
-    st.markdown('- PJM launched a new public tool [QueueScope](https://queuescope.pjm.com/queuescope/pages/public/evaluator.jsf) in Dec-2022 to facilitate the assessment of grid impacts of proposed generation before submitting interconnection requests, but information is limited  to line loading changes and does not include potential upgrade costs.')
+    st.markdown('- PJM launched a new public tool [QueueScope](https://queuescope.pjm.com/queuescope/pages/public/evaluator.jsf) in Dec-2022 to facilitate the assessment of grid impacts of proposed generation before submitting interconnection requests, but information is limited to line loading changes and does not include potential upgrade costs. ')
+
+with st.expander("See PJM news"):
+    st.markdown('- [IER](https://www.instituteforenergyresearch.org/the-grid/pjm-plans-for-a-two-year-pause-on-reviewing-project-applications/) Wind, solar and hydro represent roughly 6% of installed capacity but represent the overwhelming majprity of projects stuck in the queue. ')
+    st.markdown('- [1898 Blog](https://1898blog.burnsmcd.com/finding-new-opportunities-under-a-streamlined-pjm-interconnection-process) The congestion is largely due to the increase in applications for renewable solar, wind, energy storage or combined generation and storage projects. ')
 
 with st.expander("See service type notes"):
     st.subheader('Service Type')
@@ -99,3 +159,5 @@ with st.expander("See service type notes"):
     st.markdown('- Capacity status reserves transmission capacity for the output of the generator during high load hours, for example allowing the project owner to have deliverable capacity that it can bid into resource adequacy markets. While  capacity resources may still be curtailed during emergency events, they are treated preferentially in comparison to energy resources. This privilege comes with  a  cost  however, as the generator may need to pay for additional transmission network upgrades.')
     st.markdown('- Energy service permits participation in the energy market and largely uses the existing transmission system on an as available basis. The **vast majority (95%)** of all projects studied between 2017 and 2022 chose **capacity** as service type, a substantial increase over earlier years.')
     st.markdown('- Capacity status for wind offshore: 100%, solar: 99%,  wind  onshore: 98%. The  exception  of  solar  hybrid  projects (76%). Natural gas (95%) and storage (92%) stand-alone installations have slightly lower rates.')
+
+
