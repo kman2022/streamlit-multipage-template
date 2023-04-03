@@ -3,7 +3,9 @@ import pandas as pd
 import geopandas as gpd
 import streamlit as st
 import leafmap.foliumap as leafmap
-
+import folium
+from streamlit_folium import st_folium
+from folium.plugins import Draw
 
 st.set_page_config(page_title="PJM Costs ⚡",
                    page_icon='https://i.imgur.com/UbOXYAU.png',
@@ -13,6 +15,8 @@ PROCESS_IMAGE = 'https://github.com/kman2022/data/blob/main/main/berkley/IQ_stud
 TRANSMISSION_IMAGE = 'https://github.com/kman2022/data/blob/main/main/berkley/transmission.png?raw=true'
 pjm_im = 'https://www.pjm.com/assets/responsive/img/pjm-logo.png'
 MAP_FILE = "https://github.com/kman2022/data/blob/main/main/berkley/df_pjm_cost_map_agg.csv?raw=true"
+MAP_GEO = "https://github.com/kman2022/data/blob/main/main/berkley/gdf_pjm_cost_map_agg.geojson?raw=true"
+
 ISO_FILE = 'https://github.com/kman2022/data/blob/main/main/berkley/pjm.geojson?raw=true'
 TRANS_FILE = 'https://github.com/kman2022/data/blob/main/main/berkley/pjm_transmission_short.geojson?raw=true'
 
@@ -35,6 +39,7 @@ st.title("PJM Generator Interconnection Costs")
 def load_pjm_cost_map_data():
     # geoloc hist
     df_map_cost = pd.read_csv(MAP_FILE)
+    df_map_cost.info()
     # geoloc shape
     gdf_iso = gpd.read_file(ISO_FILE)
     return df_map_cost, gdf_iso
@@ -117,7 +122,7 @@ select_fuel = filter_fuel(df_map_cost)
 # need chart showing cost growth
 # need trany line overlay
 
-with st.expander("See source code"):
+with st.expander("See heat map and source code"):
     with st.echo():
         df = df_map_cost
         df = df[df['q_year'] == select_yr]
@@ -125,6 +130,7 @@ with st.expander("See source code"):
         df = df[df['request_status'] == status_type]
         map_lat = df['lat'].mean()
         map_lon = df['lon'].mean()
+        df = df[df['$2022_total_cost/kw']>0]
         m = leafmap.Map(center=[map_lat, map_lon], zoom=7, tiles="stamentoner")
         m.add_heatmap(
             df,
@@ -161,6 +167,64 @@ with st.expander("See source code"):
         t_hover_style = {"fillOpacity": 0.5}
         m.add_geojson(TRANS_FILE, layer_name="HV transmission", style=t_style, hover_style=t_hover_style)
 m.to_streamlit(height=700)
+    
+# with st.expander("See 3D map and source code"):
+#     with st.echo():
+#         df = df_map_cost
+#         df = df[df['q_year'] == select_yr]
+#         df = df[df['fuel']==select_fuel]
+#         df = df[df['request_status'] == status_type]
+#         map_lat = df['lat'].mean()
+#         map_lon = df['lon'].mean()
+#         df = df[df['$2022_total_cost/kw']>0]
+        
+#         map = folium.Map(location=[map_lat,map_lon], 
+#                          zoom_start=7, 
+#                          control_scale=True,
+#                          tiles='CartoDB Positron',
+#                          attr='<a href="TBD">TBD</a>')
+        
+
+#         folium.GeoJson(data=ISO_FILE,name=('PJM area'),
+#                         tooltip=folium.GeoJsonTooltip(fields=['region','PEAK_LOAD','AVG_LOAD','YEAR'],labels=True),
+#                         style_function= lambda feature: {'fillOpacity':0.3, 'weight':0.2}
+#                         ).add_to(map)
+        
+#         cp = folium.Choropleth(
+#             geo_data=MAP_GEO['geometry'],
+#             name="Counties",
+#             data=MAP_GEO,
+#             columns=["NAME","$2022_total_cost/kw","nameplate_mw"],
+#             key_on="properties.NAME",
+#             fill=True,
+#             fill_color="YlOrRd",
+#             fill_opacity=0.6,
+#             line_opacity=0.5,
+#             highlight=True,
+#             edgecolor='k',
+#             # bins=list(MAP_GEO['$2022_total_cost/kw'].quantile([0,0.25,.5,.75,1])),
+#             legend_name="Costs in USD per kW"
+#         )
+#         cp.add_to(map)
+#         feature = folium.features.GeoJson(MAP_GEO,
+#           name='NAME',
+#           tooltip=folium.GeoJsonTooltip(fields= ["NAME","$2022_total_cost/kw","mw1"],
+#                                         aliases=["County: ","Avg. duration: ","Sum capacity: "],
+#                                         labels=True, 
+#                                         localize=True,
+#                                         style=("background-color: white; color: black;font-family:arial, padding: 10px;")))
+                                        
+#         cp.add_child(feature)
+        
+#         folium.LayerControl().add_to(map)
+                
+            
+        
+        
+        
+        
+        
+        
 
 with st.expander("See technical notes"):
     st.subheader('Definitions:')
