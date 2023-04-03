@@ -217,14 +217,6 @@ m.to_streamlit(height=700)
 #         cp.add_child(feature)
         
 #         folium.LayerControl().add_to(map)
-                
-            
-        
-        
-        
-        
-        
-        
 
 with st.expander("See technical notes"):
     st.subheader('Definitions:')
