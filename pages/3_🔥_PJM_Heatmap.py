@@ -4,8 +4,12 @@ import geopandas as gpd
 import streamlit as st
 import leafmap.foliumap as leafmap
 from folium import plugins
+import matplotlib.pyplot as plt
+import matplotlib.style as style
 
 # to do
+# fix template to match
+# fix map filters when there is no fuel avail
 # volume how to make 3D or format the border of the polygon - team
 # perhaps a better way to display map filtering by cost type - team
 # need format popup box - team
@@ -25,8 +29,21 @@ MAP_GEO = "https://github.com/kman2022/data/blob/main/main/berkley/gdf_pjm_cost_
 ISO_FILE = 'https://github.com/kman2022/data/blob/main/main/berkley/pjm.geojson?raw=true'
 TRANS_FILE = 'https://github.com/kman2022/data/blob/main/main/berkley/pjm_transmission_short.geojson?raw=true'
 
+style.use('fivethirtyeight')
+plt.rcParams['lines.linewidth'] = 1
+dpi = 1000
+plt.rcParams['font.size'] = 13
+plt.rcParams['font.family'] = 'Lato'
+plt.rcParams['axes.labelsize'] = plt.rcParams['font.size']
+plt.rcParams['axes.titlesize'] = plt.rcParams['font.size']
+plt.rcParams['legend.fontsize'] = plt.rcParams['font.size']
+plt.rcParams['xtick.labelsize'] = plt.rcParams['font.size']
+plt.rcParams['ytick.labelsize'] = plt.rcParams['font.size']
+plt.rcParams['figure.figsize'] = 8, 8
+
+
 mkdwn_analysis = """
-    **Source:** [Generator Interconnection Costs to the Transmission System:](https://emp.lbl.gov/interconnection_costs): Data for PJM Territory through 2022. Joachim Seel, Joseph Rand, Will Gorman, Dev Millstein, Ryan Wiser. January 2023.
+    **Source:** [Generator Interconnection Costs to the Transmission System:](https://emp.lbl.gov/interconnection_costs) Data for PJM Territory through 2022. Joachim Seel, Joseph Rand, Will Gorman, Dev Millstein, Ryan Wiser. January 2023.
 """
 
 st.sidebar.image(pjm_im, width=200)
@@ -35,7 +52,7 @@ st.sidebar.image(PROCESS_IMAGE, width=300,
                  caption="fig. Interconnection Study Process")
 
 st.title("PJM Generator Interconnection Costs")
-
+st.sidebar.info(mkdwn_analysis)
 ###########
 # Load data
 ###########
@@ -56,7 +73,7 @@ with st.expander("See summary"):
         '- Average interconnection costs have grown substantially over time.')
     st.markdown('- Projects that have completed all required interconnection studies have the lowest cost compared to applicants still actively working through the interconnection process or those that have withdrawn.')
     st.markdown(
-        '- Broader network upgrade costs are the primary driver of recent cost increase.')
+        '- Broader network upgrade costs are the **primary driver** of recent cost increase.')
     st.markdown(
         '- Interconnection costs for wind, storage, and solar are greater than for natural gas.')
     st.markdown('- Larger generators have greater interconnection costs in absolute terms, but economies of scale exist on a per kW basis.')
@@ -65,15 +82,15 @@ with st.expander("See summary"):
 
 with st.expander("See summary findings"):
     st.subheader('Findings:')
-    st.success('More than **95% of all projects have interconnection costs under usd 200/kW**, but five projects cluster around usd 400/kW and two havec osts of usd 712/kW and usd 3,728/kW. Typical project costs are $24/kW.')
-    st.warning('Interconnection costs have **doubled from usd 42/kW before 2020 to usd 84/kW between 2020 and 2022**.')
-    st.warning('Projects that were still actively moving through the interconnection queues saw **costs increase eightfold**, from usd 29/kW to usd 240/kW (2017-2019 vs. 2020-2022.')
-    st.warning('Projects that withdraw have seen *costs more than double*,from usd 255/kW to usd 599/kW (2017-2019 vs. 2020-2022).')
-    st.warning('Costs for withdrawn projects are *more than seven times* the costs of “complete” projects between 2017 and 2022 (usd521/kWvs. usd 73/kW.')
+    st.info('More than **95% of all projects have interconnection costs under usd 200/kW**, but five projects cluster around usd 400/kW and two havec osts of usd 712/kW and usd 3,728/kW. Typical project costs are $24/kW.')
     st.warning('**Network costs** are the real cost driver and have risen in recent years from **usd 15/kW in 2017-2019 to usd 227/kW in 2020-2022**.')
-    st.info('Looking at projects studied before and after 2017, we find that natural gas interconnection costs fell from usd 40/kW to usd 18/kW. Costs grew for renewables: solar costs increased from usd 54/kW to usd 99/kW, whereas onshore wind costs rise from usd 23/kW to usd 60/kW.')
-    st.info('Network costs increased dramatically for active and withdrawn projects relative to those that completed all studies. Completed storage projects had no network upgrade costs (n=7), while the average costs for withdrawn projects was usd 709/kW (n=17). Network costs were *25 times greater* for withdrawn solar hybrid projects relative to complete projects (usd 457/kW vs. usd 18/kW). Withdrawn solar projects had **six times greater network costs** than complete projects (usd 520/kW vs. usd 82/kW), and withdrawn onshore wind projects had nearly five times the network costs of complete projects (usd 258/kW vs usd 56/kW).')
-    st.info('Eastern states again have comparatively high interconnection costs among complete (New Jersey: usd 143/kW) and withdrawn  projects (North Carolina: usd 1,068/kW, New Jersey: usd 759/kW), while western states like Indiana and Illinois have lower costs for  completed  projects (usd 14/kW, usd 20/kW), as do Kentucky and Ohio for withdrawn projects (usd 88/kW, usd 108/kW). (seen map below)')
+    st.markdown('- Network costs increased dramatically for active and withdrawn projects relative to those that completed all studies. Completed storage projects had no network upgrade costs (n=7), while the average costs for withdrawn projects was usd 709/kW (n=17). Network costs were *25 times greater* for withdrawn solar hybrid projects relative to complete projects (usd 457/kW vs. usd 18/kW). Withdrawn solar projects had **six times greater network costs** than complete projects (usd 520/kW vs. usd 82/kW), and withdrawn onshore wind projects had nearly five times the network costs of complete projects (usd 258/kW vs usd 56/kW).')
+    st.markdown('- Interconnection costs have **doubled from usd 42/kW before 2020 to usd 84/kW between 2020 and 2022**.')
+    st.markdown('- Projects that were still actively moving through the interconnection queues saw **costs increase eightfold**, from usd 29/kW to usd 240/kW (2017-2019 vs. 2020-2022.')
+    st.markdown('- Projects that withdraw have seen *costs more than double*,from usd 255/kW to usd 599/kW (2017-2019 vs. 2020-2022).')
+    st.markdown('- Costs for withdrawn projects are *more than seven times* the costs of “complete” projects between 2017 and 2022 (usd521/kWvs. usd 73/kW.')
+    st.markdown('- Looking at projects studied before and after 2017, we find that natural gas interconnection costs fell from usd 40/kW to usd 18/kW. Costs grew for renewables: solar costs increased from usd 54/kW to usd 99/kW, whereas onshore wind costs rise from usd 23/kW to usd 60/kW.')
+    st.markdown('- Eastern states again have comparatively high interconnection costs among complete (New Jersey: usd 143/kW) and withdrawn  projects (North Carolina: usd 1,068/kW, New Jersey: usd 759/kW), while western states like Indiana and Illinois have lower costs for  completed  projects (usd 14/kW, usd 20/kW), as do Kentucky and Ohio for withdrawn projects (usd 88/kW, usd 108/kW). (seen map below)')
 
 with st.expander("See summary details"):
     st.subheader('Details:')
@@ -202,16 +219,42 @@ with st.expander("See map and source code"):
 
 m.to_streamlit(height=700)
 
+###########
+# Display raw data
+###########
+
 if st.checkbox("Show Raw Cost Data from Map",False,help = 'Displays the raw data based on filters.'):
       st.subheader('Raw Cost Data')
       raw_gdf = gdf[['NAME','nameplate_mw','$2022_poi_cost/kw','$2022_network_cost/kw','$2022_total_cost/kw']]
       raw_gdf.rename({'NAME':'County name','nameplate_mw':'Capacity (MW)'},axis=1,inplace=True)
       st.write(raw_gdf)
 
-chart_df = pd.DataFrame(raw_gdf)
+###########
+# Boxplot chart
+###########
+chart_df = pd.DataFrame(gdf)
+arr = chart_df[['$2022_poi_cost/kw','$2022_network_cost/kw','$2022_total_cost/kw']]
+columns = arr.columns.values.tolist()
+fig, ax = plt.subplots()
 
+ax.set(
+# title='Cost distribution',
+ylabel='Costs per kW',
+# xlabel='Types of Costs'
+)
 
-# st.plotly_chart(f)
+ax.yaxis.grid(True, linestyle='-', which='major', color='lightgrey',
+               alpha=0.5)
+
+ax.boxplot(arr,sym='+',vert=True,whis=1.5,notch=False)
+
+ax.set_xticklabels(columns)
+
+st.pyplot(fig)
+
+###########
+# Cost growth chart
+###########
 
 with st.expander("See technical notes"):
     st.subheader('Definitions:')

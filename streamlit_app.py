@@ -11,6 +11,7 @@ st.set_page_config(page_title="Interconnection Dashboard",
 # Customize the sidebar
 src_markdown = """
 **[Berkley Lab Reports](https://emp.lbl.gov/)**  
+**[Berkley Lab Charts](https://emp.lbl.gov/generation-storage-and-hybrid-capacity)**
 GitHub Repository: <https://github.com/kman2022/streamlit-multipage-template>
 """
 ferc_markdown = """
