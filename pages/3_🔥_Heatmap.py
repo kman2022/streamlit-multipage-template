@@ -1,20 +1,19 @@
 
-import numpy as np
-import pandas as pd
+# import numpy as np
+# import pandas as pd
 import geopandas as gpd
 import streamlit as st
 import leafmap.foliumap as leafmap
-import folium
-from streamlit_folium import st_folium
-from folium.plugins import Draw
-import leafmap.colormaps as cm
-from leafmap.common import hex_to_rgb
-
+from folium import plugins
+# import folium
+# from streamlit_folium import st_folium
+# from folium.plugins import Draw
+# import leafmap.colormaps as cm
+# from leafmap.common import hex_to_rgb
 
 st.set_page_config(page_title="PJM Costs ⚡",
                    page_icon='https://i.imgur.com/UbOXYAU.png',
                    layout="wide")
-
 
 PROCESS_IMAGE = 'https://github.com/kman2022/data/blob/main/main/berkley/IQ_study_process_small%20copy.png?raw=true'
 TRANSMISSION_IMAGE = 'https://github.com/kman2022/data/blob/main/main/berkley/transmission.png?raw=true'
@@ -94,13 +93,11 @@ def unique_no_nan(x):
 
 gdf, gdf_iso = load_pjm_cost_map_data()
 
-# fix filter format
-# volume how to make 3D
-# price color by price
-# need popup box
+# volume how to make 3D or format the border of the polygon - team
+# perhaps a better way to display map filtering by cost type - team
+# need format popup box - team
 # need chart below showing avg cost by status type
 # need chart showing cost growth
-
 
 row1_col1, row1_col2, row1_col3, row1_col4, row1_col5 = st.columns([1, 1, 1, 1, 1])
 with row1_col1:
@@ -123,26 +120,21 @@ with row1_col3:
                                   fuel_list,index=default_ft,
                                   help = 'Filter report to show the fuel type of the project.')
 
+gdf = gdf[gdf['q_year'] == select_yr]
+gdf = gdf[gdf['fuel']==select_fuel]
+gdf = gdf[gdf['request_status'] == status_type]
+# not all of the records have cost information
+gdf = gdf[gdf['$2022_total_cost/kw']>0]
+# creating a mid point to initialize the map
+map_lat = gdf.centroid.y.mean()
+map_lon = gdf.centroid.x.mean()
+gdf = gdf[['NAME','$2022_poi_cost/kw','$2022_network_cost/kw','$2022_total_cost/kw','nameplate_mw','geometry']]
+gdf = gdf.to_crs(4326)
+gdf['lon'] = gdf.centroid.x  
+gdf['lat'] = gdf.centroid.y
+
 with st.expander("See map and source code"):
     with st.echo():
-        gdf = gdf[gdf['q_year'] == select_yr]
-        gdf = gdf[gdf['fuel']==select_fuel]
-        gdf = gdf[gdf['request_status'] == status_type]
-        # not all of the records have cost information
-        gdf = gdf[gdf['$2022_total_cost/kw']>0]
-        # creating a mid point to initialize the map
-        map_lat = gdf.centroid.y.mean()
-        map_lon = gdf.centroid.x.mean()
-        gdf = gdf[['NAME','$2022_poi_cost/kw','$2022_network_cost/kw','$2022_total_cost/kw','nameplate_mw','geometry']]
-        gdf = gdf.to_crs(4326)
-        gdf['lon'] = gdf.centroid.x  
-        gdf['lat'] = gdf.centroid.y
-
-        # tooltip = {
-        #     "html": "<b>Name:</b> {NAME}<br><b>Value:</b> {$2022_total_cost/kw}",
-        #     "style": {"backgroundColor": "steelblue", "color": "white"},
-        # }
-
         m = leafmap.Map(center=[map_lat, map_lon], 
                         zoom_start=7, 
                         tiles="stamentoner")
@@ -196,7 +188,8 @@ with st.expander("See map and source code"):
         m.add_geojson(ISO_FILE, 
                       layer_name="PJM area", 
                       style=iso_style, 
-                      hover_style=iso_hover_style)
+                      hover_style=iso_hover_style,
+                      show=False)
         
         t_style = {
                 "stroke": True,
@@ -213,57 +206,18 @@ with st.expander("See map and source code"):
                       layer_name="HV transmission", 
                       style=t_style, 
                       hover_style=t_hover_style)
+        
+        plugins.MiniMap().add_to(m)
+        
 m.to_streamlit(height=700)
-    
-# with st.expander("See 3D map and source code"):
-#     with st.echo():
-#         df = df_map_cost
-#         df = df[df['q_year'] == select_yr]
-#         df = df[df['fuel']==select_fuel]
-#         df = df[df['request_status'] == status_type]
-#         map_lat = df['lat'].mean()
-#         map_lon = df['lon'].mean()
-#         df = df[df['$2022_total_cost/kw']>0]
-        
-#         map = folium.Map(location=[map_lat,map_lon], 
-#                          zoom_start=7, 
-#                          control_scale=True,
-#                          tiles='CartoDB Positron',
-#                          attr='<a href="TBD">TBD</a>')
-        
 
-#         folium.GeoJson(data=ISO_FILE,name=('PJM area'),
-#                         tooltip=folium.GeoJsonTooltip(fields=['region','PEAK_LOAD','AVG_LOAD','YEAR'],labels=True),
-#                         style_function= lambda feature: {'fillOpacity':0.3, 'weight':0.2}
-#                         ).add_to(map)
-        
-#         cp = folium.Choropleth(
-#             geo_data=MAP_GEO['geometry'],
-#             name="Counties",
-#             data=MAP_GEO,
-#             columns=["NAME","$2022_total_cost/kw","nameplate_mw"],
-#             key_on="properties.NAME",
-#             fill=True,
-#             fill_color="YlOrRd",
-#             fill_opacity=0.6,
-#             line_opacity=0.5,
-#             highlight=True,
-#             edgecolor='k',
-#             # bins=list(MAP_GEO['$2022_total_cost/kw'].quantile([0,0.25,.5,.75,1])),
-#             legend_name="Costs in USD per kW"
-#         )
-#         cp.add_to(map)
-#         feature = folium.features.GeoJson(MAP_GEO,
-#           name='NAME',
-#           tooltip=folium.GeoJsonTooltip(fields= ["NAME","$2022_total_cost/kw","mw1"],
-#                                         aliases=["County: ","Avg. duration: ","Sum capacity: "],
-#                                         labels=True, 
-#                                         localize=True,
-#                                         style=("background-color: white; color: black;font-family:arial, padding: 10px;")))
-                                        
-#         cp.add_child(feature)
-        
-#         folium.LayerControl().add_to(map)
+if st.checkbox("Show Raw Cost Data from Map",False,help = 'Displays the raw data based on filters.'):
+      st.subheader('Raw Cost Data')
+      raw_gdf = gdf[['NAME','nameplate_mw','$2022_poi_cost/kw','$2022_network_cost/kw','$2022_total_cost/kw']]
+      raw_gdf.rename({'NAME':'County name','nameplate_mw':'Capacity (MW)'},axis=1,inplace=True)
+      st.write(raw_gdf)
+
+# st.plotly_chart(f)
 
 with st.expander("See technical notes"):
     st.subheader('Definitions:')
