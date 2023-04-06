@@ -17,7 +17,6 @@ ferc_markdown = """
 **[Federal Energy Regulatory Commission (FERC)](https://www.ferc.gov/)**
 """
 
-
 st.sidebar.title("About")
 
 st.sidebar.info(src_markdown)
@@ -34,7 +33,6 @@ st.markdown(
     This multipage app template demonstrates various interactive web apps created using [streamlit](https://streamlit.io) and [leafmap](https://leafmap.org). It is an open-source project and you are very welcome to contribute to the [GitHub repository](https://github.com/giswqs/streamlit-multipage-template).
     """
 )
-
 
 st.image(PWR_IMAGE,width=350)
 st.header("Instructions")
@@ -69,4 +67,3 @@ st.markdown('- FERC broadened how it defines “generating facility” to includ
 st.subheader('8. 🔑 Technological changes')
 st.markdown('- Grid operators assess proposed changes to pending interconnection requests to determine whether the changes are a “material modification,” meaning whether they would materially affect the cost or timing of projects later in the interconnection queue. If a proposed change is a material modification, then the project developer must either forgo the change or forfeit its queue position and start over.')
 st.markdown('- Grid operators must also provide lists of “permissible technological advancements” that are not material modifications by definition.')
-

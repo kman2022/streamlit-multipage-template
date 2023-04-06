@@ -1,15 +1,18 @@
 
-# import numpy as np
-# import pandas as pd
+import pandas as pd
 import geopandas as gpd
 import streamlit as st
 import leafmap.foliumap as leafmap
 from folium import plugins
-# import folium
-# from streamlit_folium import st_folium
-# from folium.plugins import Draw
-# import leafmap.colormaps as cm
-# from leafmap.common import hex_to_rgb
+
+# to do
+# volume how to make 3D or format the border of the polygon - team
+# perhaps a better way to display map filtering by cost type - team
+# need format popup box - team
+# need chart below showing avg cost by status type
+# need chart showing cost growth
+# are costs and connection costs higher in the border regions where must coordinate with adjoing tso?
+# imporve performance of maps
 
 st.set_page_config(page_title="PJM Costs ⚡",
                    page_icon='https://i.imgur.com/UbOXYAU.png',
@@ -18,9 +21,7 @@ st.set_page_config(page_title="PJM Costs ⚡",
 PROCESS_IMAGE = 'https://github.com/kman2022/data/blob/main/main/berkley/IQ_study_process_small%20copy.png?raw=true'
 TRANSMISSION_IMAGE = 'https://github.com/kman2022/data/blob/main/main/berkley/transmission.png?raw=true'
 pjm_im = 'https://www.pjm.com/assets/responsive/img/pjm-logo.png'
-MAP_FILE = "https://github.com/kman2022/data/blob/main/main/berkley/df_pjm_cost_map_agg.csv?raw=true"
 MAP_GEO = "https://github.com/kman2022/data/blob/main/main/berkley/gdf_pjm_cost_map_agg.geojson?raw=true"
-
 ISO_FILE = 'https://github.com/kman2022/data/blob/main/main/berkley/pjm.geojson?raw=true'
 TRANS_FILE = 'https://github.com/kman2022/data/blob/main/main/berkley/pjm_transmission_short.geojson?raw=true'
 
@@ -35,18 +36,17 @@ st.sidebar.image(PROCESS_IMAGE, width=300,
 
 st.title("PJM Generator Interconnection Costs")
 
-# quantify growth
-# quantify costs / split out / split out by fuel
-# are costs and connection times higher in the border regions where must coordinate with adjoing tso?
+###########
+# Load data
+###########
+
 @st.cache_data(persist=True)
 def load_pjm_cost_map_data():
-    # df hist
-    # df_map_cost = pd.read_csv(MAP_FILE)
     # geodf
     gdf = gpd.read_file(MAP_GEO)
     # geoloc shape
     gdf_iso = gpd.read_file(ISO_FILE)
-    # return df_map_cost, gdf, gdf_iso
+
     return gdf, gdf_iso
 
 with st.expander("See summary"):
@@ -88,16 +88,7 @@ with st.expander("See summary details"):
 def unique_no_nan(x):
     return x.dropna().unique()
 
-# assign data and filters
-# df_map_cost, gdf, gdf_iso = load_pjm_cost_map_data()
-
 gdf, gdf_iso = load_pjm_cost_map_data()
-
-# volume how to make 3D or format the border of the polygon - team
-# perhaps a better way to display map filtering by cost type - team
-# need format popup box - team
-# need chart below showing avg cost by status type
-# need chart showing cost growth
 
 row1_col1, row1_col2, row1_col3, row1_col4, row1_col5 = st.columns([1, 1, 1, 1, 1])
 with row1_col1:
@@ -113,7 +104,7 @@ with row1_col2:
       select_yr = st.selectbox('Year entered queue:',
                                 year_list,index=default_yr,
                                 help = 'Filter to display the year in which the project entered the queue (see fig. Interconnection Study Process).')
-with row1_col3:   
+with row1_col3:
       fuel_list = list(unique_no_nan(gdf['fuel']))
       default_ft = fuel_list.index('Solar')
       select_fuel = st.selectbox('Fuel:',
@@ -130,13 +121,13 @@ map_lat = gdf.centroid.y.mean()
 map_lon = gdf.centroid.x.mean()
 gdf = gdf[['NAME','$2022_poi_cost/kw','$2022_network_cost/kw','$2022_total_cost/kw','nameplate_mw','geometry']]
 gdf = gdf.to_crs(4326)
-gdf['lon'] = gdf.centroid.x  
+gdf['lon'] = gdf.centroid.x
 gdf['lat'] = gdf.centroid.y
 
 with st.expander("See map and source code"):
     with st.echo():
-        m = leafmap.Map(center=[map_lat, map_lon], 
-                        zoom_start=7, 
+        m = leafmap.Map(center=[map_lat, map_lon],
+                        zoom_start=7,
                         tiles="stamentoner")
 
         m.add_heatmap(
@@ -147,7 +138,7 @@ with st.expander("See map and source code"):
             name="Heat map",
             radius=20,
         )
-        
+
         g_hover_style = {"fillOpacity": 0.7}
         g_style = {
                 "stroke": True,
@@ -160,19 +151,19 @@ with st.expander("See map and source code"):
                 "font-family": "lato"
                 # 'fillColor': 'red' if feature['properties']['$2022_total_cost/kw'] > 150 else '#0000ff',
                 }
-        
-        m.add_gdf(gdf,layer_name='Cost and Capacity', 
-                  zoom_to_layer=True, 
+
+        m.add_gdf(gdf,layer_name='Cost and Capacity',
+                  zoom_to_layer=True,
                   info_mode='on_hover',
                   style=g_style,
                   hover_style=g_hover_style
                   )
-        
+
         vmin = 0
         vmax = max(gdf['$2022_total_cost/kw'])
         colors = ['a7d661','f2e250','f58727','f52b25']
         m.add_colorbar(colors=colors, vmin=vmin, vmax=vmax,caption='Costs in $/kW')
-        
+
         iso_style = {
                 "stroke": True,
                 "color": "#607fc2",
@@ -184,13 +175,13 @@ with st.expander("See map and source code"):
                 "font-family": "lato"
                 }
         iso_hover_style = {"fillOpacity": 0.7}
-        
-        m.add_geojson(ISO_FILE, 
-                      layer_name="PJM area", 
-                      style=iso_style, 
+
+        m.add_geojson(ISO_FILE,
+                      layer_name="PJM area",
+                      style=iso_style,
                       hover_style=iso_hover_style,
                       show=False)
-        
+
         t_style = {
                 "stroke": True,
                 "color": "#8a8988",
@@ -202,13 +193,13 @@ with st.expander("See map and source code"):
                 "font-family": "lato"
                 }
         t_hover_style = {"fillOpacity": 0.5}
-        m.add_geojson(TRANS_FILE, 
-                      layer_name="HV transmission", 
-                      style=t_style, 
+        m.add_geojson(TRANS_FILE,
+                      layer_name="HV transmission",
+                      style=t_style,
                       hover_style=t_hover_style)
-        
+
         plugins.MiniMap().add_to(m)
-        
+
 m.to_streamlit(height=700)
 
 if st.checkbox("Show Raw Cost Data from Map",False,help = 'Displays the raw data based on filters.'):
@@ -216,6 +207,9 @@ if st.checkbox("Show Raw Cost Data from Map",False,help = 'Displays the raw data
       raw_gdf = gdf[['NAME','nameplate_mw','$2022_poi_cost/kw','$2022_network_cost/kw','$2022_total_cost/kw']]
       raw_gdf.rename({'NAME':'County name','nameplate_mw':'Capacity (MW)'},axis=1,inplace=True)
       st.write(raw_gdf)
+
+chart_df = pd.DataFrame(raw_gdf)
+
 
 # st.plotly_chart(f)
 

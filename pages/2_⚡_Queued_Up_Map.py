@@ -1,12 +1,18 @@
 
-# import pandas as pd
-# import altair as alt
+
 import geopandas as gpd
 import streamlit as st
 import folium
 from streamlit_folium import st_folium
 from folium.plugins import Draw
 
+# to do
+# need to remap projects as CA does not display in the geojson
+# rerun figures for map 1 file per market in order to speed up the map
+# use file in doc/streamlit/data file as manual adjustments were made to several hundred plants
+# add height or increased weight on borders for volume
+# are connection times higher in the border regions where must coordinate with adjoing tso?
+# https://folium.streamlit.app/
 
 st.set_page_config(page_title="Queued Up Map ⚡",
                    page_icon='https://i.imgur.com/UbOXYAU.png',
@@ -21,14 +27,6 @@ mkdwn_analysis = """
 st.sidebar.info(mkdwn_analysis)
 logo = "https://i.imgur.com/UbOXYAU.png"
 st.sidebar.image(logo)
-
-# to do
-# need to remap projects as CA is not avail
-# rerun figures for map 1 file per market in order to speed up the map
-# use file in doc/streamlit/data file as manual adjustments were made to several hundred plants
-# add height or increased weight on borders for volume
-# https://folium.streamlit.app/
-
 
 link_prefix = "https://raw.githubusercontent.com/kman2022/data/main/main/"
 csv_q_hist = link_prefix + "berkley/df_iq_clean.csv"
@@ -146,24 +144,24 @@ def main():
         gdf = gdf[gdf['q_status'] == status_type]
         gdf_short = gdf[['NAME','diff_months_cod','mw1','geometry']]
 
-        gdf_agg = gdf_short.dissolve(by='NAME', aggfunc = {'diff_months_cod':'mean','mw1':'sum'},as_index=False) 
+        gdf_agg = gdf_short.dissolve(by='NAME', aggfunc = {'diff_months_cod':'mean','mw1':'sum'},as_index=False)
         gdf_geo = gdf_agg[['NAME','diff_months_cod','mw1','geometry']]
-        
-        map_lat = gdf_iso_sel.centroid.y
+
+        map_lat = gdf_iso_sel.centroid.y.mean()
         map_lon = gdf_iso_sel.centroid.x
 
-        map = folium.Map(location=[map_lat,map_lon], 
-                         zoom_start=MAP_ZOOM, 
+        map = folium.Map(location=[map_lat,map_lon],
+                         zoom_start=MAP_ZOOM,
                          control_scale=True,
                          tiles='CartoDB Positron',
                          attr='<a href="TBD">TBD</a>')
-        
+
         Draw(export=True).add_to(map)
         folium.GeoJson(data=gdf_iso_sel,name=('Market areas'),
                         tooltip=folium.GeoJsonTooltip(fields=['region','PEAK_LOAD','AVG_LOAD','YEAR'],labels=True),
                         style_function= lambda feature: {'fillOpacity':0.3, 'weight':0.2}
                         ).add_to(map)
-        
+
         cp = folium.Choropleth(
             geo_data=gdf_geo,
             name="Counties",
@@ -184,21 +182,14 @@ def main():
           name='NAME',
           tooltip=folium.GeoJsonTooltip(fields= ["NAME","diff_months_cod","mw1"],
                                         aliases=["County: ","Avg. duration: ","Sum capacity: "],
-                                        labels=True, 
+                                        labels=True,
                                         localize=True,
                                         style=("background-color: white; color: black;font-family:arial, padding: 10px;")))
-                                        
+
         cp.add_child(feature)
 
         folium.LayerControl().add_to(map)
         row4_col1 = st_folium(map, width=750)
-    # cp.add_child(
-    #     folium.features.GeoJsonTooltip(["GEOID", "duration"], labels=True)
-    # )
-
-    
-    # row2_col1, row2_col2 = st.columns([19, 1.0])
-    # row2_col1.st_map = st_folium(map, width=700, height=450)
 
 main()
 
