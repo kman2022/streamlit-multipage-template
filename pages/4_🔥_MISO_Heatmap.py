@@ -15,7 +15,7 @@ PROCESS_IMAGE = 'https://github.com/kman2022/data/blob/main/main/berkley/IQ_stud
 TRANSMISSION_IMAGE = 'https://github.com/kman2022/data/blob/main/main/berkley/transmission.png?raw=true'
 miso_im = 'https://www.misoenergy.org/client/dist/img/logo.png'
 MAP_GEO = "https://github.com/kman2022/data/blob/main/main/berkley/gdp_cost_miso_qeo.geojson?raw=true"
-ISO_FILE = 'https://github.com/kman2022/data/blob/main/main/berkley/pjm.geojson?raw=true'
+ISO_FILE = 'https://github.com/kman2022/data/blob/main/main/berkley/miso.geojson?raw=true'
 # TRANS_FILE = 'https://github.com/kman2022/data/blob/main/main/berkley/pjm_transmission_short.geojson?raw=true'
 
 style.use('fivethirtyeight')
@@ -166,23 +166,23 @@ with st.expander("See map and source code"):
         colors = ['a7d661','f2e250','f58727','f52b25']
         cm.add_colorbar(colors=colors, vmin=vmin, vmax=vmax,caption='Costs in $/kW')
 
-        # iso_style = {
-        #         "stroke": True,
-        #         "color": "#607fc2",
-        #         "weight": 2,
-        #         "opacity": 1,
-        #         "fill": True,
-        #         "fillColor": "##607fc2",
-        #         "fillOpacity": 0.1,
-        #         "font-family": "lato"
-        #         }
-        # iso_hover_style = {"fillOpacity": 0.7}
+        iso_style = {
+                "stroke": True,
+                "color": "#607fc2",
+                "weight": 2,
+                "opacity": 1,
+                "fill": True,
+                "fillColor": "##607fc2",
+                "fillOpacity": 0.1,
+                "font-family": "lato"
+                }
+        iso_hover_style = {"fillOpacity": 0.7}
 
-        # m.add_geojson(ISO_FILE,
-        #               layer_name="MISO area",
-        #               style=iso_style,
-        #               hover_style=iso_hover_style,
-        #               show=False)
+        cm.add_geojson(ISO_FILE,
+                      layer_name="MISO area",
+                      style=iso_style,
+                      hover_style=iso_hover_style,
+                      show=False)
 
         # t_style = {
         #         "stroke": True,
@@ -200,7 +200,7 @@ with st.expander("See map and source code"):
         #               style=t_style,
         #               hover_style=t_hover_style)
 
-        # plugins.MiniMap().add_to(m)
+        plugins.MiniMap().add_to(cm)
 
 cm.to_streamlit(height=700)
 
