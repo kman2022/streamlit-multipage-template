@@ -11,12 +11,14 @@ st.set_page_config(page_title="MISO Costs ⚡",
                    page_icon='https://i.imgur.com/UbOXYAU.png',
                    layout="wide")
 
+# add transmission map
+
 PROCESS_IMAGE = 'https://github.com/kman2022/data/blob/main/main/berkley/IQ_study_process_small%20copy.png?raw=true'
 TRANSMISSION_IMAGE = 'https://github.com/kman2022/data/blob/main/main/berkley/transmission.png?raw=true'
 miso_im = 'https://www.misoenergy.org/client/dist/img/logo.png'
 MAP_GEO = "https://github.com/kman2022/data/blob/main/main/berkley/gdp_cost_miso_qeo.geojson?raw=true"
 ISO_FILE = 'https://github.com/kman2022/data/blob/main/main/berkley/miso.geojson?raw=true'
-# TRANS_FILE = 'https://github.com/kman2022/data/blob/main/main/berkley/pjm_transmission_short.geojson?raw=true'
+TRANS_FILE = 'https://github.com/kman2022/data/blob/main/main/berkley/miso_transmission_short.geojson?raw=true'
 
 style.use('fivethirtyeight')
 plt.rcParams['lines.linewidth'] = 1
@@ -129,6 +131,7 @@ gdf['lat'] = gdf.centroid.y
 
 with st.expander("See map and source code"):
     with st.echo():
+        
         cm = leafmap.Map(center=[cmap_lat, cmap_lon],
                         zoom_start=7,
                         tiles="stamentoner")
@@ -201,7 +204,7 @@ with st.expander("See map and source code"):
         #               hover_style=t_hover_style)
 
         plugins.MiniMap().add_to(cm)
-
+        
 cm.to_streamlit(height=700)
 
 ###########
