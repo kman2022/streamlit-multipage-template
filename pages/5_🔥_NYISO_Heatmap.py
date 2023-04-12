@@ -49,8 +49,11 @@ st.title("NYISO Generator Interconnection Costs")
 
 @st.cache_data(persist=True)
 def load_cost_map_data():
+    # clean ' $-   ' from network cost column
     # geodf
     gdf = gpd.read_file(NY_MAP_GEO)
+    gdf.replace(' $-   ',0,inplace=True)
+    gdf['$2022_network_cost/kw'] = gdf['$2022_network_cost/kw'].astype(float)
     # geoloc shape
     gdf_iso = gpd.read_file(NYISO_FILE)
     return gdf, gdf_iso
@@ -103,7 +106,7 @@ row1_col1, row1_col2, row1_col3, row1_col4, row1_col5 = st.columns([
                                                                    1, 1, 1, 1, 1])
 with row1_col1:
     status_list = list(unique_no_nan(gdf['request_status']))
-    default_st = status_list.index('Withdrawn')
+    default_st = status_list.index('Active')
     status_type = st.selectbox('Status:',
                                    status_list, index=default_st,
                                    help='Filter to show the status type of the project (see fig. Interconnection Study Process).')
@@ -111,29 +114,27 @@ with row1_col2:
       year_list = gdf['q_year'].sort_values(
           ascending=False, na_position='last')
       year_list = list(unique_no_nan(year_list))
-      default_yr = year_list.index(2020)
+      default_yr = year_list.index(2019)
       select_yr = st.selectbox('Year entered queue:',
                                 year_list, index=default_yr,
                                 help='Filter to display the year in which the project entered the queue (see fig. Interconnection Study Process).')
 with row1_col3:
-      fuel_list = list(unique_no_nan(gdf['fuel']))
+      fuel_list = list(unique_no_nan(gdf['resource_type']))
       default_ft = fuel_list.index('Solar')
       select_fuel = st.selectbox('Fuel:',
                                   fuel_list, index=default_ft,
                                   help='Filter report to show the fuel type of the project.')
 
-# clean ' $-   ' from network cost column
-
 gdf = gdf[gdf['q_year'] == select_yr]
-gdf = gdf[gdf['fuel'] == select_fuel]
+gdf = gdf[gdf['resource_type'] == select_fuel]
 gdf = gdf[gdf['request_status'] == status_type]
 # not all of the records have cost information
-gdf = gdf[gdf['real_total/kw'] > 0]
+gdf = gdf[gdf['$2022_total_cost/kw'] > 0]
 # creating a mid point to initialize the map
 cmap_lat = gdf.centroid.y.mean()
 cmap_lon = gdf.centroid.x.mean()
-gdf = gdf[['NAME', 'real_poi/kw', 'real_network/kw',
-    'real_total/kw', 'nameplate_mw', 'geometry']]
+gdf = gdf[['county', '$2022_poi_cost/kw', '$2022_network_cost/kw',
+    '$2022_total_cost/kw', 'nameplate_mw', 'geometry']]
 gdf = gdf.to_crs(4326)
 gdf['lon'] = gdf.centroid.x
 gdf['lat'] = gdf.centroid.y
@@ -141,15 +142,15 @@ gdf['lat'] = gdf.centroid.y
 with st.expander("See map and source code"):
     with st.echo():
 
-        pjm_map = leafmap.Map(center=[cmap_lat, cmap_lon],
+        n_map = leafmap.Map(center=[cmap_lat, cmap_lon],
                         zoom_start=7,
                         tiles="stamentoner")
 
-        pjm_map.add_heatmap(
+        n_map.add_heatmap(
             gdf,
             latitude="lat",
             longitude="lon",
-            value="real_total/kw",
+            value="$2022_total_cost/kw",
             name="Heat map",
             radius=20,
         )
@@ -166,7 +167,7 @@ with st.expander("See map and source code"):
                 "font-family": "lato"
                 }
 
-        pjm_map.add_gdf(gdf, layer_name='Cost and Capacity',
+        n_map.add_gdf(gdf, layer_name='Cost and Capacity',
                   zoom_to_layer=True,
                   info_mode='on_hover',
                   style=g_style,
@@ -174,9 +175,9 @@ with st.expander("See map and source code"):
                   )
 
         vmin = 0
-        vmax = max(gdf['real_total/kw'])
+        vmax = max(gdf['$2022_total_cost/kw'])
         colors = ['a7d661', 'f2e250', 'f58727', 'f52b25']
-        pjm_map.add_colorbar(colors=colors, vmin=vmin,
+        n_map.add_colorbar(colors=colors, vmin=vmin,
                         vmax=vmax, caption='Costs in $/kW')
 
         iso_style = {
@@ -191,7 +192,7 @@ with st.expander("See map and source code"):
                 }
         iso_hover_style = {"fillOpacity": 0.7}
 
-        pjm_map.add_geojson(ISO_FILE,
+        n_map.add_geojson(NYISO_FILE,
                       layer_name="NYISO area",
                       style=iso_style,
                       hover_style=iso_hover_style,
@@ -213,27 +214,26 @@ with st.expander("See map and source code"):
         #               style=t_style,
         #               hover_style=t_hover_style)
 
-        plugins.MiniMap().add_to(pjm_map)
+        plugins.MiniMap().add_to(n_map)
 
-pjm_map.to_streamlit(height=700)
+n_map.to_streamlit(height=700)
 
 ###########
 # Display raw data
 ###########
 
+raw_gdf = gdf[['county', 'nameplate_mw', '$2022_poi_cost/kw','$2022_network_cost/kw', '$2022_total_cost/kw']]
+raw_gdf.rename({'county': 'County name', 'nameplate_mw': 'Capacity (MW)'}, axis=1, inplace=True)
+
 if st.checkbox("Show Raw Cost Data from Map", False, help='Displays the raw data based on filters.'):
       st.subheader('Raw Cost Data')
-      raw_gdf = gdf[['NAME', 'nameplate_mw', 'real_poi/kw',
-          'real_network/kw', 'real_total/kw']]
-      raw_gdf.rename(
-          {'NAME': 'County name', 'nameplate_mw': 'Capacity (MW)'}, axis=1, inplace=True)
       st.write(raw_gdf)
 
 ###########
 # Boxplot chart
 ###########
 chart_df = pd.DataFrame(gdf)
-arr = chart_df[['real_poi/kw', 'real_network/kw', 'real_total/kw']]
+arr = chart_df[['$2022_poi_cost/kw', '$2022_network_cost/kw', '$2022_total_cost/kw']]
 columns = arr.columns.values.tolist()
 fig, ax = plt.subplots()
 
@@ -269,19 +269,19 @@ with st.expander("See technical notes"):
     st.markdown('- **2022 POI Cost/kW**: interconnection costs of point of interconnection components in real usd 2022/kW using a gdp deflator.')
     st.markdown('- **2022 Network Cost/kW**: interconnection costs of network upgrade components in real usd 2022/kW using a gdp deflator.')
     st.markdown('- **2022 Total Cost/kW**: total interconnection costs (sum of POI and network components) in real usd 2022/kW using a gdp deflator.')
-    st.markdown('Note: POI (Interconnection Facilities) costs usually do not include electrical facilities at the generator itself, like transformers or spur lines. Instead, they are predominantly driven by the construction of an interconnection station and transmission line extensions to those interconnection stations. The categories are referred to in the interconnection studies as “Connecting Transmission Owner Attachment Facilities” and “Stand-alone System Upgrade Facilities.” Commonly listed equipment includes new POI stations, revenue metering, and disconnect switches at the point of change of ownership."')
-    st.markdown('Note: Network costs are referred to in interconnection studies as “System Upgrade Facilities,” “System Deliverability Upgrades,” “Affected System Upgrades,” “Part 2 Allocation,” and “Headroom Payments.” A wide array of upgrades and equipment can fall in this category, including remote substation work, transmission line protection upgrades, and other transmission line work.')
+    st.markdown('- Note: POI (Interconnection Facilities) costs usually do not include electrical facilities at the generator itself, like transformers or spur lines. Instead, they are predominantly driven by the construction of an interconnection station and transmission line extensions to those interconnection stations. The categories are referred to in the interconnection studies as “Connecting Transmission Owner Attachment Facilities” and “Stand-alone System Upgrade Facilities.” Commonly listed equipment includes new POI stations, revenue metering, and disconnect switches at the point of change of ownership."')
+    st.markdown('- Note: Network costs are referred to in interconnection studies as “System Upgrade Facilities,” “System Deliverability Upgrades,” “Affected System Upgrades,” “Part 2 Allocation,” and “Headroom Payments.” A wide array of upgrades and equipment can fall in this category, including remote substation work, transmission line protection upgrades, and other transmission line work.')
 
 with st.expander("See NYISO resources"):
     st.subheader('[NYISO Resources:](https://www.nyiso.com/cspp)')
-    st.subheader('- [NYISO queue](https://www.nyiso.com/interconnections)')
+    st.subheader('[NYISO queue](https://www.nyiso.com/interconnections)')
     st.markdown('- [NYISO Power System Information](https://www.nyiso.com/ny-power-system-information-outlook)')
     st.markdown('- [NYISO Planning Reñiability Compliance](https://www.nyiso.com/planning-reliability-compliance)')
     st.markdown('- The Climate Leadership and Community Protection Act (CLCPA) of 2019 that mandates New York State procure 9 GW of offshore wind by 2035. Long Island offers the closest interconnection location for several offshore lease areas. Based on the expected influx of offshore wind power driven by the CLCPA, the Long Island Power Authority identified, and the New York Public Service Commission (PSC) established, the need for (1) increased export capability “from Zone K to Zones I and J to ensure the full output from at least 3,000 MW of offshore wind is deliverable from Long Island to the rest of the State” and (2) upgraded local transmission facilities to support the increased export capability (“Order Addressing Public Policy Requirements For Transmission Planning Purposes” 2021). This is known as the Long Island Offshore Wind Export Public Policy Transmission Need ([LI PPTN](https://www.nyiso.com/documents/20142/22968753/LI-OSW-Export-PPTN-Viability-Sufficiency-Assessment_Report.pdf)).')
     st.markdown('- The costs of selected LI PPTN transmission project(s) will be allocated to all load zones in the state based on their share of total energy consumption. Statewide allocation, as opposed to assigning most costs to Long Island and New York City where the project(s) will be located, was deemed most appropriate by the PSC because “the entire focus of the identified transmission need is on facilitating compliance with the CLCPA” (“Order On Petitions For Rehearing - Case 20-E-0497 and Case 18-E-0623” 2022).')
 
 with st.expander("See interconnection study notes"):
-    st.subheader('NYISO Interconnection Studies (see [manual Jan-23](https://www.nyiso.com/documents/20142/2924447/tei_mnl.pdf/b2f926e9-2faa-2c42-5a09-2402cdb8bacc?t=1672852997127)')
+    st.subheader('NYISO Interconnection Studies (see [manual Jan-23](https://www.nyiso.com/documents/20142/2924447/tei_mnl.pdf/b2f926e9-2faa-2c42-5a09-2402cdb8bacc?t=1672852997127))')
     st.markdown('- **Feasibility Study:** The IR fee is 10k usd, the FS deposit is 10k usd. It takes from 45 to 90 days.')
     st.markdown('- **System Impact Study:** The deposit is 120k usd. It takes around 90 days.')
     st.markdown('- **Facilities Study:** The deposit is 100k usd or 50k usd as applicable.')
