@@ -17,6 +17,8 @@ plt.rcParams['xtick.labelsize'] = plt.rcParams['font.size']
 plt.rcParams['ytick.labelsize'] = plt.rcParams['font.size']
 plt.rcParams['figure.figsize'] = 8, 8
 
+# fix the legend in the charts
+
 st.set_page_config(page_title="Queued Up  ⚡",
                    page_icon='📈',
                    layout="wide")
