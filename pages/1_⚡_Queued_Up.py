@@ -17,7 +17,9 @@ plt.rcParams['xtick.labelsize'] = plt.rcParams['font.size']
 plt.rcParams['ytick.labelsize'] = plt.rcParams['font.size']
 plt.rcParams['figure.figsize'] = 8, 8
 
-# fix the legend in the charts
+# fix the legend in the top 3 charts
+# fix the label in tab region
+# fix dataframe labels in the operational perc tables
 
 st.set_page_config(page_title="Queued Up  ⚡",
                    page_icon='📈',
@@ -223,7 +225,7 @@ def app():
 
     #############
     with st.expander("See tabular completion by region"):
-        st.code('''# p30 Completion (COD) Percentage of Queued Projects for IRs from 2000-2015
+        st.code('''# see report p30 Completion (COD) Percentage of Queued Projects for IRs from 2000-2015
             df_trend = df_trend[['q_year', 'q_status', 'mw1','region']]
             df_trend = df_trend[(df_trend['q_year']>=2000)&(df_trend['q_year']<=2015)]
             reg_status_volume = df_trend.groupby(['region','q_status']).agg({'mw1':'sum'})
@@ -241,7 +243,7 @@ def app():
                   width=60, props="width: 120px; border-right: 1px solid black;")\
              .text_gradient(cmap="bwr", vmin=-2.5, vmax=2.5))
 
-    st.markdown('- Only 27% of all projects requesting interconnection from 2000 to 2016 achieved commercial operation by year-end 2021. (page 2 PJM Costs)')
+    st.markdown('- **Only 27%** of all projects requesting interconnection from 2000 to 2016 achieved commercial operation by year-end 2021. (see pg. 2 PJM Cost Report)')
     st.info('- While unable to tie out the number exactly it misses the trend and wide variation between markets 📈')
 
     df_tr1 = df_trend[['q_year', 'cod_year','q_status','mw1','region']]
@@ -266,16 +268,16 @@ def app():
 
     #############
     with st.expander("See tabular operational trend"):
-        row7_col1, row7_col2= st.columns([1,1])
-        st.code("""
+        st.code(""" # reference the 24% completion figure
             def_cod = df_trend[(df_tr1['q_year']>=2000)&(df_tr1['q_year']<=2016)&(df_tr1['cod_year']<=2021)]
             def_cod_count = def_cod.groupby(['q_status']).agg({'mw1':'count'}) # 24%
             def_cod_count_tot = def_cod.agg({'mw1':'count'})
             def_perc_cod_count = def_cod_count.div(def_cod_count_tot,level='mw1') * 100
         """, language="python")
-        row7_col1.caption("Trend operational count")
+        row7_col1, row7_col2= st.columns([1,1])
+        row7_col1.caption("Trend total count percent")
         row7_col1.dataframe(def_perc_cod_trend)
-        row7_col2.caption("Trend regional operational volume")
+        row7_col2.caption("Trend count by region percent")
         row7_col2.dataframe(df_reg_perc_cod_tot)
 
     #############
