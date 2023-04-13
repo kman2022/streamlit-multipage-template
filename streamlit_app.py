@@ -8,7 +8,13 @@ st.set_page_config(page_title="Interconnection Dashboard",
                    page_icon=UC_IMAGE,
                    layout="wide")
 
+# to do
 # Customize the sidebar
+# customize year slider at the bottom
+# use applet for boxes on current status https://mailchi.mp/ff4662025c14/npm-1st-look-developers-debate-covid-19-fallout-heelstone-monetizes-apex-preps-next-ny-project-13365650?e=338f724bc3
+# integrate more info such as LCOE for PV https://emp.lbl.gov/utility-scale-solar/
+# add information on curtailments
+
 src_markdown = """
 **[Berkley Lab Reports](https://emp.lbl.gov/)**  
 **[Berkley Lab Charts](https://emp.lbl.gov/generation-storage-and-hybrid-capacity)**

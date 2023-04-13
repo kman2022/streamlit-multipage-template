@@ -1,7 +1,9 @@
 --find-links=https://girder.github.io/large_image_wheels GDAL
-geemap
 pandas
 geopandas
+altair
+matplotlib
+folium
 jupyter-server-proxy
 leafmap
 nbserverproxy
