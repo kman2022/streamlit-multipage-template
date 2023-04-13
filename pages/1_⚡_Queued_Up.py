@@ -149,45 +149,58 @@ def app():
     with row3_col1:
         df_chart_trend = df_trend[(df_trend['region']==region_select)&(df_trend['type_clean'].isin(selected_options_ft))&(df_trend['q_year']>=qyear_select)]
         df_chart_trend = df_chart_trend[['q_year','q_status','mw1']]
-        row3_col1.subheader("Trend: volume")
+        
         bar_chart = alt.Chart(
                         df_chart_trend,
-                    ).mark_bar().encode(
-                        x = 'q_year:O',
-                        y = 'sum(mw1):Q',
+                        title="Trend: volume",
+                    ).mark_bar(
+                        cornerRadiusTopLeft=3,
+                        cornerRadiusTopRight=3
+                        ).encode(
+                        x = alt.X('q_year:O',title="Year"),
+                        y = alt.Y('sum(mw1):Q',title="Capapcity"),
                         color = 'q_status:N'
                     )
-        st.altair_chart(bar_chart, use_container_width=True)
+
+        st.altair_chart(bar_chart, theme="streamlit", use_container_width=True)
 
     #############
     with st.expander("See chart trend by count"):
 
         row4_col1, row4_col2= st.columns([5,1])
     with row4_col1:
-        row4_col1.subheader("Trend: count")
         bar_chart = alt.Chart(
                         df_chart_trend,
-                    ).mark_bar().encode(
-                        x = 'q_year:O',
-                        y = 'count(mw1):Q',
+                        title="Trend: count",
+                    ).mark_bar(
+                        cornerRadiusTopLeft=3,
+                        cornerRadiusTopRight=3                                                
+                        ).encode(
+                        x = alt.X('q_year:O',title="Year"),
+                        y = alt.Y('count(mw1):Q',title="Count"),
                         color = 'q_status:N'
                     )
-        st.altair_chart(bar_chart, use_container_width=True)
+
+        st.altair_chart(bar_chart, theme="streamlit", use_container_width=True)
 
     #############
     with st.expander("See chart trend by status breakout"):
 
         row5_col1, row4_col2= st.columns([5,1])
     with row5_col1:
-        row5_col1.subheader("Trend: percent capacity")
         bar_chart = alt.Chart(
                         df_chart_trend,
-                    ).mark_bar().encode(
-                        x = 'q_year:O',
-                        y = alt.Y('count(mw1):Q',stack='normalize'),
+                        title="Trend: percent capacity",
+                    ).mark_bar(
+                        cornerRadiusTopLeft=3,
+                        cornerRadiusTopRight=3                        
+                        ).encode(
+                        x = alt.X('q_year:O',title="Year"),
+                        y = alt.Y('count(mw1):Q',title="Count",stack='normalize'),
                         color = 'q_status:N'
                     )
-        st.altair_chart(bar_chart, use_container_width=True)
+
+        st.altair_chart(bar_chart, theme="streamlit", use_container_width=True)
 
     df_tr = df_trend[['q_year', 'q_status', 'mw1','region']]
     df_tr = df_tr[(df_tr['q_year']>=2000)&(df_tr['q_year']<=2015)]
