@@ -14,6 +14,9 @@ st.set_page_config(page_title="Interconnection Dashboard",
 # use applet for boxes on current status https://mailchi.mp/ff4662025c14/npm-1st-look-developers-debate-covid-19-fallout-heelstone-monetizes-apex-preps-next-ny-project-13365650?e=338f724bc3
 # integrate more info such as LCOE for PV https://emp.lbl.gov/utility-scale-solar/
 # add information on curtailments and LMP prices
+# add internal definitions https://docs.google.com/document/d/1oZr96wwyDcQvngWdHcvOVg9YLnNyrnpzbRH_z0Qk-Hk/edit
+# https://levelten.atlassian.net/wiki/spaces/PRODUCT/pages/595722331/Interconnection+queue+data+research+plan+-+Q4+2022
+# https://www.leveltenenergy.com/post/project-development-essentials
 
 src_markdown = """
 **[Berkley Lab Reports](https://emp.lbl.gov/)**  
