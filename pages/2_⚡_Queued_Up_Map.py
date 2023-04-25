@@ -149,7 +149,9 @@ def main():
 
         map_lat = gdf_iso_sel.centroid.y.mean()
         map_lon = gdf_iso_sel.centroid.x
-
+        gdf_iso_sel.to_crs("EPSG:4326")
+        gdf_geo.to_crs("EPSG:4326")
+        
         map = folium.Map(location=[map_lat,map_lon],
                          zoom_start=MAP_ZOOM,
                          control_scale=True,
