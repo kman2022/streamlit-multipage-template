@@ -157,7 +157,7 @@ def main():
                          attr='<a href="TBD">TBD</a>')
 
         Draw(export=True).add_to(map)
-        folium.GeoJson(data=gdf_iso_sel,name=('Market areas'),
+        folium.GeoJson(data=gdf_iso_sel,name='Market areas',
                         tooltip=folium.GeoJsonTooltip(fields=['region','PEAK_LOAD','AVG_LOAD','YEAR'],labels=True),
                         style_function= lambda feature: {'fillOpacity':0.3, 'weight':0.2}
                         ).add_to(map)
