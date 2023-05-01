@@ -16,9 +16,9 @@ plt.rcParams['xtick.labelsize'] = plt.rcParams['font.size']
 plt.rcParams['ytick.labelsize'] = plt.rcParams['font.size']
 plt.rcParams['figure.figsize'] = 8, 8
 
-# fix the legend in the top 3 charts
-# fix the label in tab region
-# fix dataframe labels in the operational perc tables
+# todo fix the legend in the top 3 charts
+# todo fix the label in tab region
+# todo fix dataframe labels in the operational perc tables
 
 st.set_page_config(page_title="Queued Up  ⚡",
                    page_icon='📈',
@@ -61,21 +61,17 @@ def load_q_data():
     df_hist = pd.read_csv(csv_duration)
     return df_trend, df_dur, df_hist
 
-
 # Load data
 df_trend, df_dur, df_hist = load_q_data()
 
-
 def unique_no_nan(x):
     return x.dropna().unique()
-
 
 @st.cache_data(persist=True)
 def regions(df):
     region_list = list(unique_no_nan(df['region']))
     default_region = region_list.index('PJM')
     return region_list, default_region
-
 
 @st.cache_data(persist=True)
 def filter_data(df, yr, ft, loc):
@@ -86,14 +82,12 @@ def filter_data(df, yr, ft, loc):
     df = df[df['region'] == loc]
     return df
 
-
 def status_types(df):
     status_list = list(unique_no_nan(df['q_status']))
     default_st = status_list.index('active')
     status_type = st.selectbox('Status:', status_list, index=default_st,
                                help='Filter report to show the status type of the project')
     return status_type
-
 
 def filter_year(df):
     year_list = df['q_year'].sort_values(ascending=False, na_position='last')
@@ -102,7 +96,6 @@ def filter_year(df):
     select_yr = st.selectbox('Year entered queue:', year_list, index=default_yr,
                              help='Filter report to show the year in which the project entered the queue.')
     return select_yr
-
 
 def app():
     st.title("U.S. Interconnection Data and Market Trends")
@@ -160,10 +153,8 @@ def app():
                                          value=2014,
                                          help='Filter report to show the year the project entered the queue.')
 
-    #############
-    #############
+    #
     with st.expander("See chart trend by volume"):
-
         row3_col1, row3_col2 = st.columns([5, 1])
     with row3_col1:
         df_chart_trend = df_trend[
@@ -185,9 +176,8 @@ def app():
 
         st.altair_chart(bar_chart, theme="streamlit", use_container_width=True)
 
-    #############
+    #
     with st.expander("See chart trend by count"):
-
         row4_col1, row4_col2 = st.columns([5, 1])
     with row4_col1:
         bar_chart = alt.Chart(
@@ -204,9 +194,8 @@ def app():
 
         st.altair_chart(bar_chart, theme="streamlit", use_container_width=True)
 
-    #############
+    #
     with st.expander("See chart trend by status breakout"):
-
         row5_col1, row4_col2 = st.columns([5, 1])
     with row5_col1:
         bar_chart = alt.Chart(
@@ -244,9 +233,9 @@ def app():
         'page 30)')
     st.info('- This is misleading when viewed by volume: PJM (18%), MISO (19%), ISONE (23%), CAISO (10%) 📈')
 
-    #############
+    #
     with st.expander("See tabular completion by region"):
-        st.code('''# see report p30 Completion (COD) Percentage of Queued Projects for IRs from 2000-2015
+        st.code('''Completion (COD) Percentage of Queued Projects from 2000-2015.
             df_trend = df_trend[['q_year', 'q_status', 'mw1','region']]
             df_trend = df_trend[(df_trend['q_year']>=2000)&(df_trend['q_year']<=2015)]
             reg_status_volume = df_trend.groupby(['region','q_status']).agg({'mw1':'sum'})
