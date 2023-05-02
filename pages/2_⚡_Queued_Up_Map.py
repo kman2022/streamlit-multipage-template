@@ -94,9 +94,9 @@ def filter_fuel(df):
     return select_fuel
 
 
-###########
+#
 # Load data
-###########
+#
 gdf_hist, gdf_iso = load_qmap_data()
 
 
@@ -110,28 +110,25 @@ def main():
     #
     with row1_col1:
         select_year = filter_year(gdf_hist)
-
-    ###############
+    #
     # Load status
-    ###############
+    #
     with row1_col2:
         status_type = filter_status(gdf_hist)
-
-    ###############
+    #
     # Load regions
-    ###############
+    #
     with row1_col3:
         select_region, default_region = filter_regions(gdf_hist)
 
     row2_col1, row2_col2, row2_col3 = st.columns([3.0, 3.0, 3.4])
-    ###############
+    #
     # Load fuel type
-    ###############
+    #
     with row2_col1:
         select_fuel = filter_fuel(gdf_hist)
 
     row3_col1, row3_col2 = st.columns([3, 3.4])
-
     row4_col1, row4_col2 = st.columns([19, 1])
 
     with row4_col1:
